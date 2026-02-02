@@ -40,6 +40,18 @@ npm run dev
 ```
 Then open http://localhost:3000 in your browser.
 
+**Phase 4 AI Integration** (Optional - requires API key):
+```bash
+# Add your Anthropic API key to .env.local
+# Get key from: https://console.anthropic.com/settings/keys
+echo "ANTHROPIC_API_KEY=your_api_key_here" > .env.local
+
+# Restart dev server to load environment variables
+npm run dev
+```
+
+See [PHASE4_SETUP.md](./PHASE4_SETUP.md) for detailed setup instructions.
+
 ### Development Setup
 
 **Prerequisites:**
@@ -136,11 +148,15 @@ certtracker/
 - [x] AI confidence score display
 - [x] Validation issues panel
 
-### Phase 4: Claude Vision Integration
-- [ ] ACORD 25 form extraction
-- [ ] Field validation logic
-- [ ] Confidence scoring
-- [ ] Issue detection
+### Phase 4: Claude Vision Integration ✅ COMPLETE
+- [x] ACORD 25 form extraction using Claude Sonnet 4
+- [x] Field validation logic with venue requirements
+- [x] Confidence scoring based on extraction completeness
+- [x] Issue detection (errors, warnings, info)
+- [x] API endpoint for certificate processing
+- [x] Real-time extraction during vendor upload
+- [x] Intelligent validation rules (coverage, dates, additional insured)
+- **Note**: Results not persisted yet (Phase 6 will add database)
 
 ### Phase 5: Auto-Chaser System
 - [ ] Email template builder
@@ -154,6 +170,15 @@ certtracker/
 - [ ] Authentication
 - [ ] File storage
 - [ ] API routes
+- [ ] **Vendor Reusability System:**
+  - [ ] Vendors table with unique identifiers (email-based)
+  - [ ] Certificates table with expiration tracking
+  - [ ] Event-Vendor-Certificate junction table
+  - [ ] Search existing vendors when adding to events
+  - [ ] Auto-link valid certificates to new events
+  - [ ] Flag certificates expiring before event date
+  - [ ] Smart renewal requests (only when needed)
+  - [ ] Multi-event certificate status display
 
 ## 📊 Mock Data (Phase 1)
 

@@ -114,28 +114,83 @@ export default function VendorUploadPage() {
       return;
     }
 
-    // Simulate upload progress
+    // Start upload and extraction process
     setStep('uploading');
     setUploadProgress(0);
 
-    const interval = setInterval(() => {
-      setUploadProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setStep('success');
-          return 100;
-        }
-        return prev + 10;
-      });
-    }, 200);
+    try {
+      // Convert PDF to base64
+      const base64Pdf = await fileToBase64(selectedFile);
 
-    // In production, this would upload to Supabase Storage
-    // const formData = new FormData();
-    // formData.append('file', selectedFile);
-    // formData.append('vendorName', vendorName);
-    // formData.append('vendorEmail', vendorEmail);
-    // formData.append('vendorType', vendorType);
-    // await uploadCertificate(eventId, formData);
+      setUploadProgress(30);
+
+      // Call extraction API
+      const response = await fetch('/api/extract-certificate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          pdfBase64: base64Pdf,
+          eventDate: event.date,
+          vendorName,
+          vendorEmail,
+          vendorType,
+          eventId,
+          venueRequirements: {
+            minGeneralLiability: 1000000,
+            minAggregateLimit: 2000000,
+            requireAdditionalInsured: true,
+            certificateHolderName: event.venue,
+          },
+        }),
+      });
+
+      setUploadProgress(70);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to process certificate');
+      }
+
+      const result = await response.json();
+
+      setUploadProgress(90);
+
+      // In Phase 6, this would save to Supabase database
+      console.log('Extraction result:', result);
+
+      setUploadProgress(100);
+
+      // Small delay before showing success
+      setTimeout(() => {
+        setStep('success');
+      }, 500);
+    } catch (err) {
+      console.error('Upload error:', err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to upload certificate. Please try again.'
+      );
+      setStep('form');
+      setUploadProgress(0);
+    }
+  };
+
+  // Helper function to convert file to base64
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64String = reader.result as string;
+        // Remove data URL prefix (e.g., "data:application/pdf;base64,")
+        const base64Data = base64String.split(',')[1];
+        resolve(base64Data);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   };
 
   const vendorTypes = [
@@ -184,6 +239,14 @@ export default function VendorUploadPage() {
     );
   }
 
+  // Get upload progress message
+  const getProgressMessage = () => {
+    if (uploadProgress < 30) return 'Uploading certificate...';
+    if (uploadProgress < 70) return 'Extracting data with AI...';
+    if (uploadProgress < 90) return 'Validating certificate...';
+    return 'Finalizing...';
+  };
+
   // Uploading screen
   if (step === 'uploading') {
     return (
@@ -193,7 +256,7 @@ export default function VendorUploadPage() {
             <div className="w-16 h-16 rounded-full bg-indigo-50 flex items-center justify-center mx-auto mb-4">
               <Upload className="w-8 h-8 text-indigo-600 animate-pulse" />
             </div>
-            <h1 className="text-xl font-semibold text-slate-900 mb-2">Uploading Certificate...</h1>
+            <h1 className="text-xl font-semibold text-slate-900 mb-2">{getProgressMessage()}</h1>
             <p className="text-sm text-slate-600">Please don't close this window</p>
           </div>
 
@@ -210,6 +273,15 @@ export default function VendorUploadPage() {
               />
             </div>
           </div>
+
+          {/* AI Processing indicator */}
+          {uploadProgress >= 30 && uploadProgress < 90 && (
+            <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 text-center">
+              <p className="text-sm text-indigo-700">
+                Using Claude AI to extract and validate certificate data...
+              </p>
+            </div>
+          )}
         </div>
       </div>
     );
