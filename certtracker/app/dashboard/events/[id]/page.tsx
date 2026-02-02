@@ -80,8 +80,9 @@ const eventData = {
   },
 };
 
-export default function EventDetailPage({ params }: { params: { id: string } }) {
-  const event = eventData[params.id as keyof typeof eventData];
+export default async function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const event = eventData[id as keyof typeof eventData];
 
   if (!event) {
     return (
