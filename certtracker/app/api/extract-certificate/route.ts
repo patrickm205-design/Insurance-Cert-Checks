@@ -25,10 +25,10 @@ export async function POST(request: NextRequest) {
           role: 'user',
           content: [
             {
-              type: 'image',
+              type: 'document' as any,
               source: {
                 type: 'base64',
-                media_type: 'application/pdf',
+                media_type: 'application/pdf' as any,
                 data: pdfBase64,
               },
             },
