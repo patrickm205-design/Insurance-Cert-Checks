@@ -75,8 +75,10 @@ certtracker/
 │   ├── dashboard/
 │   │   ├── page.tsx              # Main dashboard
 │   │   ├── layout.tsx            # Dashboard layout with sidebar
-│   │   └── events/[id]/
-│   │       └── page.tsx          # Event detail page
+│   │   ├── events/[id]/
+│   │   │   └── page.tsx          # Event detail page
+│   │   └── certificates/[id]/
+│   │       └── page.tsx          # Certificate review page
 │   ├── upload/[eventId]/
 │   │   └── page.tsx              # Public vendor upload portal
 │   ├── layout.tsx                # Root layout
@@ -125,11 +127,14 @@ certtracker/
 - [x] Request COI email functionality
 - [ ] File storage setup (Phase 6 - backend)
 
-### Phase 3: Certificate Review Page
-- [ ] PDF viewer component
-- [ ] Side-by-side comparison view
-- [ ] Issue highlighting
-- [ ] Approve/Reject workflow
+### Phase 3: Certificate Review Page ✅ COMPLETE
+- [x] PDF viewer component (placeholder ready for react-pdf)
+- [x] Side-by-side comparison view (PDF + extracted data)
+- [x] Issue highlighting with severity levels
+- [x] Approve/Reject workflow with modals
+- [x] Notes and comments system
+- [x] AI confidence score display
+- [x] Validation issues panel
 
 ### Phase 4: Claude Vision Integration
 - [ ] ACORD 25 form extraction
