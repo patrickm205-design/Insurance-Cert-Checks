@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Mail, Eye, Send } from 'lucide-react';
 import TrafficLightBadge from './certificates/TrafficLightBadge';
 
@@ -21,6 +22,12 @@ interface VendorTableProps {
 }
 
 export default function VendorTable({ vendors, eventId }: VendorTableProps) {
+  // Mock mapping of vendor IDs to certificate IDs (in Phase 6, this comes from database)
+  const vendorToCertMap: Record<string, string> = {
+    'v2': 'cert1', // Summit AV -> cert1
+    'v4': 'cert2', // Harmonic Entertainment -> cert2
+  };
+
   const sendCOIRequest = (vendor: Vendor) => {
     if (!eventId) return;
 
@@ -117,10 +124,13 @@ export default function VendorTable({ vendors, eventId }: VendorTableProps) {
                       Request COI
                     </button>
                   ) : (
-                    <button className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2">
+                    <Link
+                      href={`/dashboard/certificates/${vendorToCertMap[vendor.id] || 'cert1'}`}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2"
+                    >
                       <Eye className="w-3.5 h-3.5" />
                       Review
-                    </button>
+                    </Link>
                   )}
                 </div>
               </td>
