@@ -77,6 +77,8 @@ certtracker/
 │   │   ├── layout.tsx            # Dashboard layout with sidebar
 │   │   └── events/[id]/
 │   │       └── page.tsx          # Event detail page
+│   ├── upload/[eventId]/
+│   │   └── page.tsx              # Public vendor upload portal
 │   ├── layout.tsx                # Root layout
 │   └── page.tsx                  # Homepage (redirects to dashboard)
 ├── components/
@@ -113,11 +115,15 @@ certtracker/
 - [x] Vendor tables with status badges
 - [x] Professional design system implementation
 
-### Phase 2: Vendor Upload Portal (Next)
-- [ ] Public upload page (no login required)
-- [ ] File dropzone for PDFs
-- [ ] Upload confirmation emails
-- [ ] File storage setup
+### Phase 2: Vendor Upload Portal ✅ COMPLETE
+- [x] Public upload page (no login required)
+- [x] File dropzone for PDFs with drag-and-drop
+- [x] Upload progress indicator
+- [x] Upload confirmation screen
+- [x] Vendor information form
+- [x] Copy upload link feature
+- [x] Request COI email functionality
+- [ ] File storage setup (Phase 6 - backend)
 
 ### Phase 3: Certificate Review Page
 - [ ] PDF viewer component
