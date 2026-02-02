@@ -1,7 +1,0 @@
-{
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "cd certtracker && npm run build",
-  "devCommand": "cd certtracker && npm run dev",
-  "installCommand": "cd certtracker && npm install",
-  "outputDirectory": "certtracker/.next"
-}
