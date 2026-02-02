@@ -1,5 +1,8 @@
+'use client';
+
 import Link from 'next/link';
-import { ArrowLeft, Calendar, User2, MapPin, Send } from 'lucide-react';
+import { ArrowLeft, Calendar, User2, MapPin, Send, Link as LinkIcon } from 'lucide-react';
+import { useState } from 'react';
 import VendorTable from '@/components/VendorTable';
 
 // Mock data for the Johnson-Smith Wedding
@@ -80,9 +83,16 @@ const eventData = {
   },
 };
 
-export default async function EventDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const event = eventData[id as keyof typeof eventData];
+export default function EventDetailPage({ params }: { params: { id: string } }) {
+  const [copied, setCopied] = useState(false);
+  const event = eventData[params.id as keyof typeof eventData];
+
+  const copyUploadLink = () => {
+    const uploadUrl = `${window.location.origin}/upload/${params.id}`;
+    navigator.clipboard.writeText(uploadUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   if (!event) {
     return (
@@ -199,10 +209,34 @@ export default async function EventDetailPage({ params }: { params: Promise<{ id
         </div>
       </div>
 
+      {/* Upload Link */}
+      <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-6 mb-6">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <h3 className="text-sm font-semibold text-indigo-900 mb-1">Vendor Upload Link</h3>
+            <p className="text-sm text-indigo-700 mb-3">
+              Share this link with vendors so they can upload their certificates directly.
+            </p>
+            <div className="flex items-center gap-3">
+              <code className="flex-1 bg-white border border-indigo-200 rounded-lg px-4 py-2.5 text-sm text-slate-700 font-mono">
+                {typeof window !== 'undefined' ? `${window.location.origin}/upload/${params.id}` : '/upload/...'}
+              </code>
+              <button
+                onClick={copyUploadLink}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2 flex-shrink-0"
+              >
+                <LinkIcon className="w-4 h-4" />
+                {copied ? 'Copied!' : 'Copy Link'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Vendor Table */}
       <div>
         <h2 className="text-lg font-semibold text-slate-900 mb-4">Vendor Certificates</h2>
-        <VendorTable vendors={event.vendors} />
+        <VendorTable vendors={event.vendors} eventId={params.id} />
       </div>
     </div>
   );

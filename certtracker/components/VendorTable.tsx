@@ -17,9 +17,25 @@ interface Vendor {
 
 interface VendorTableProps {
   vendors: Vendor[];
+  eventId?: string;
 }
 
-export default function VendorTable({ vendors }: VendorTableProps) {
+export default function VendorTable({ vendors, eventId }: VendorTableProps) {
+  const sendCOIRequest = (vendor: Vendor) => {
+    if (!eventId) return;
+
+    const uploadUrl = `${window.location.origin}/upload/${eventId}`;
+    const subject = encodeURIComponent('Certificate of Insurance Required');
+    const body = encodeURIComponent(
+      `Hi ${vendor.name},\n\n` +
+      `We need your Certificate of Insurance (ACORD 25 form) for the upcoming event.\n\n` +
+      `Please upload your certificate using this link:\n${uploadUrl}\n\n` +
+      `If you have any questions, please don't hesitate to reach out.\n\n` +
+      `Thank you!`
+    );
+
+    window.location.href = `mailto:${vendor.email}?subject=${subject}&body=${body}`;
+  };
   return (
     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
       <table className="w-full">
@@ -93,7 +109,10 @@ export default function VendorTable({ vendors }: VendorTableProps) {
               <td className="py-4 px-6">
                 <div className="flex items-center justify-end gap-2">
                   {vendor.status === 'gray' ? (
-                    <button className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2">
+                    <button
+                      onClick={() => sendCOIRequest(vendor)}
+                      className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2"
+                    >
                       <Send className="w-3.5 h-3.5" />
                       Request COI
                     </button>
