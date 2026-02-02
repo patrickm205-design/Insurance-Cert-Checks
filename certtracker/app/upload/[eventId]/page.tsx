@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { Upload, CheckCircle, AlertCircle, FileText, Building2, Mail, User } from 'lucide-react';
 
 // Mock event data - in production this would come from the database
@@ -15,8 +15,9 @@ const eventData: Record<string, { name: string; date: string; venue: string }> =
 
 type UploadStep = 'form' | 'uploading' | 'success' | 'error';
 
-export default async function VendorUploadPage({ params }: { params: Promise<{ eventId: string }> }) {
-  const { eventId } = await params;
+export default function VendorUploadPage() {
+  const params = useParams();
+  const eventId = params.eventId as string;
   const [step, setStep] = useState<UploadStep>('form');
   const [vendorName, setVendorName] = useState('');
   const [vendorEmail, setVendorEmail] = useState('');
