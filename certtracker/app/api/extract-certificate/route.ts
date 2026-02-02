@@ -70,7 +70,22 @@ Return ONLY the JSON object, no additional text or explanation.`,
       throw new Error('Unexpected response type from Claude');
     }
 
-    const extractedData = JSON.parse(content.text);
+    // Clean the response text - remove markdown code blocks if present
+    let responseText = content.text.trim();
+
+    // Remove markdown code blocks (```json ... ``` or ``` ... ```)
+    if (responseText.startsWith('```')) {
+      responseText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+    }
+
+    // Parse the JSON
+    let extractedData;
+    try {
+      extractedData = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('Failed to parse Claude response:', responseText);
+      throw new Error('Failed to parse certificate data from AI response');
+    }
 
     // Calculate confidence score based on how many fields were successfully extracted
     const totalFields = 14;
