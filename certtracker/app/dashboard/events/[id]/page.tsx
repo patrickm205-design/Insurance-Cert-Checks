@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { ArrowLeft, Calendar, User2, MapPin, Send, Link as LinkIcon } from 'lucide-react';
 import { useState } from 'react';
 import VendorTable from '@/components/VendorTable';
@@ -83,12 +84,14 @@ const eventData = {
   },
 };
 
-export default function EventDetailPage({ params }: { params: { id: string } }) {
+export default function EventDetailPage() {
+  const params = useParams();
+  const id = params.id as string;
   const [copied, setCopied] = useState(false);
-  const event = eventData[params.id as keyof typeof eventData];
+  const event = eventData[id as keyof typeof eventData];
 
   const copyUploadLink = () => {
-    const uploadUrl = `${window.location.origin}/upload/${params.id}`;
+    const uploadUrl = `${window.location.origin}/upload/${id}`;
     navigator.clipboard.writeText(uploadUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -219,7 +222,7 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
             </p>
             <div className="flex items-center gap-3">
               <code className="flex-1 bg-white border border-indigo-200 rounded-lg px-4 py-2.5 text-sm text-slate-700 font-mono">
-                {typeof window !== 'undefined' ? `${window.location.origin}/upload/${params.id}` : '/upload/...'}
+                {typeof window !== 'undefined' ? `${window.location.origin}/upload/${id}` : '/upload/...'}
               </code>
               <button
                 onClick={copyUploadLink}
@@ -236,7 +239,7 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
       {/* Vendor Table */}
       <div>
         <h2 className="text-lg font-semibold text-slate-900 mb-4">Vendor Certificates</h2>
-        <VendorTable vendors={event.vendors} eventId={params.id} />
+        <VendorTable vendors={event.vendors} eventId={id} />
       </div>
     </div>
   );
