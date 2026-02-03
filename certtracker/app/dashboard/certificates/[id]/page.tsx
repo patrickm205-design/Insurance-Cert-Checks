@@ -1,12 +1,35 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, FileText, Calendar, Building2, DollarSign, Shield, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 import TrafficLightBadge from '@/components/certificates/TrafficLightBadge';
 
-// Mock certificate data - in Phase 4, this will come from Claude Vision API
+type Certificate = {
+  id: string;
+  vendor: {
+    name: string;
+    email: string;
+  };
+  event: {
+    id: string;
+    name: string;
+  };
+  status: 'green' | 'yellow' | 'red' | 'gray';
+  extracted_data: Record<string, any>;
+  validation_issues: Array<{
+    severity: 'error' | 'warning' | 'info';
+    field: string;
+    issue: string;
+    detail: string;
+  }>;
+  confidence_score: number;
+  human_approved: boolean;
+  created_at: string;
+};
+
+// Mock certificate data - fallback for testing
 const certificateData: Record<string, {
   vendorName: string;
   vendorEmail: string;

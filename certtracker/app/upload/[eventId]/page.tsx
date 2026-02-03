@@ -1,23 +1,29 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { Upload, CheckCircle, AlertCircle, FileText, Building2, Mail, User } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
-// Mock event data - in production this would come from the database
-const eventData: Record<string, { name: string; date: string; venue: string }> = {
-  '1': {
-    name: 'Johnson-Smith Wedding',
-    date: 'Apr 15, 2025',
-    venue: 'Grand Ballroom at The Plaza',
-  },
+// Map friendly IDs to database UUIDs
+const EVENT_ID_MAP: Record<string, string> = {
+  '1': '00000000-0000-0000-0000-000000000001',
+};
+
+type Event = {
+  id: string;
+  name: string;
+  date: string;
+  venue: string;
+  venue_requirements: any;
 };
 
 type UploadStep = 'form' | 'uploading' | 'success' | 'error';
 
 export default function VendorUploadPage() {
   const params = useParams();
-  const eventId = params.eventId as string;
+  const friendlyEventId = params.eventId as string;
+  const eventId = EVENT_ID_MAP[friendlyEventId] || friendlyEventId;
   const [step, setStep] = useState<UploadStep>('form');
   const [vendorName, setVendorName] = useState('');
   const [vendorEmail, setVendorEmail] = useState('');
@@ -26,8 +32,41 @@ export default function VendorUploadPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState('');
+  const [event, setEvent] = useState<Event | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const event = eventData[eventId];
+  // Fetch event from database
+  useEffect(() => {
+    async function fetchEvent() {
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .eq('id', eventId)
+        .single();
+
+      if (error || !data) {
+        console.error('Failed to fetch event:', error);
+        setLoading(false);
+        return;
+      }
+
+      setEvent(data);
+      setLoading(false);
+    }
+
+    fetchEvent();
+  }, [eventId]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-8">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-sm text-slate-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!event) {
     return (
@@ -137,7 +176,7 @@ export default function VendorUploadPage() {
           vendorEmail,
           vendorType,
           eventId,
-          venueRequirements: {
+          venueRequirements: event.venue_requirements || {
             minGeneralLiability: 1000000,
             minAggregateLimit: 2000000,
             requireAdditionalInsured: true,

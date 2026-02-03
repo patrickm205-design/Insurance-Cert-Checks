@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
+import { supabase } from '@/lib/supabase';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -7,7 +8,15 @@ const anthropic = new Anthropic({
 
 export async function POST(request: NextRequest) {
   try {
-    const { pdfBase64, eventDate, venueRequirements } = await request.json();
+    const {
+      pdfBase64,
+      eventDate,
+      venueRequirements,
+      vendorName,
+      vendorEmail,
+      vendorType,
+      eventId
+    } = await request.json();
 
     if (!pdfBase64) {
       return NextResponse.json(
@@ -112,8 +121,67 @@ Return ONLY the JSON object, no additional text or explanation.`,
       status = 'yellow';
     }
 
+    // Save to database
+    let certificateId: string | null = null;
+
+    if (vendorName && vendorEmail && eventId) {
+      try {
+        // Find or create vendor
+        let vendorId: string;
+
+        const { data: existingVendor } = await supabase
+          .from('vendors')
+          .select('id')
+          .eq('email', vendorEmail)
+          .single();
+
+        if (existingVendor) {
+          vendorId = existingVendor.id;
+        } else {
+          const { data: newVendor, error: vendorError } = await supabase
+            .from('vendors')
+            .insert({
+              name: vendorName,
+              email: vendorEmail,
+              type: vendorType || 'Other',
+            })
+            .select('id')
+            .single();
+
+          if (vendorError) throw vendorError;
+          vendorId = newVendor!.id;
+        }
+
+        // Save certificate
+        const { data: certificate, error: certError } = await supabase
+          .from('certificates')
+          .upsert({
+            vendor_id: vendorId,
+            event_id: eventId,
+            status,
+            confidence_score: confidence,
+            extracted_data: extractedData,
+            validation_issues: validationIssues,
+            human_approved: false,
+          }, {
+            onConflict: 'vendor_id,event_id'
+          })
+          .select('id')
+          .single();
+
+        if (certError) throw certError;
+        certificateId = certificate!.id;
+
+        console.log('Certificate saved to database:', certificateId);
+      } catch (dbError) {
+        console.error('Database save error:', dbError);
+        // Don't fail the request if database save fails
+      }
+    }
+
     return NextResponse.json({
       success: true,
+      certificateId,
       extractedData,
       validationIssues,
       confidence,
