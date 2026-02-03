@@ -2,10 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Calendar, FileText, Settings, User } from 'lucide-react';
+import { Calendar, FileText, Settings, User, LogOut } from 'lucide-react';
+import { useAuth } from '@/lib/auth-context';
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { user, signOut } = useAuth();
 
   const navigation = [
     { name: 'Events', href: '/dashboard', icon: Calendar },
@@ -53,15 +55,24 @@ export default function Sidebar() {
 
       {/* User Profile */}
       <div className="p-4 border-t border-slate-200">
-        <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer">
+        <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg mb-2">
           <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
             <User className="w-4 h-4 text-indigo-700" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-slate-900 truncate">Sarah Johnson</p>
-            <p className="text-xs text-slate-500 truncate">Venue Manager</p>
+            <p className="text-sm font-medium text-slate-900 truncate">
+              {user?.user_metadata?.name || user?.email?.split('@')[0] || 'User'}
+            </p>
+            <p className="text-xs text-slate-500 truncate">{user?.email}</p>
           </div>
         </div>
+        <button
+          onClick={signOut}
+          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-red-50 hover:text-red-700 rounded-lg transition-colors"
+        >
+          <LogOut className="w-4 h-4" />
+          Sign Out
+        </button>
       </div>
     </div>
   );

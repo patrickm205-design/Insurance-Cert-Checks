@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, FileText, Calendar, Building2, DollarSign, Shield, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 import TrafficLightBadge from '@/components/certificates/TrafficLightBadge';
+import { useAuth } from '@/lib/auth-context';
 
 type Certificate = {
   id: string;
@@ -35,11 +36,11 @@ export default function CertificateReviewPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
+  const { user } = useAuth();
 
   const [certificate, setCertificate] = useState<Certificate | null>(null);
   const [loading, setLoading] = useState(true);
   const [notes, setNotes] = useState('');
-  const [approverName, setApproverName] = useState('');
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -65,12 +66,9 @@ export default function CertificateReviewPage() {
   }, [id]);
 
   const handleApprove = async () => {
-    if (!certificate) return;
+    if (!certificate || !user) return;
 
-    if (!approverName.trim()) {
-      alert('Please enter your name to approve this certificate');
-      return;
-    }
+    const approverName = user.user_metadata?.name || user.email?.split('@')[0] || 'Unknown User';
 
     setSubmitting(true);
     try {
@@ -79,7 +77,7 @@ export default function CertificateReviewPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           human_approved: true,
-          approved_by: approverName.trim(),
+          approved_by: approverName,
         }),
       });
 
@@ -391,24 +389,13 @@ export default function CertificateReviewPage() {
               </div>
             </div>
 
-            {/* Approver Name Input */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                Your Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={approverName}
-                onChange={(e) => setApproverName(e.target.value)}
-                placeholder="Enter your name (e.g., Amanda)"
-                className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              />
-              <p className="text-xs text-slate-500 mt-1">
-                This will be recorded as the person who approved this certificate
-              </p>
-            </div>
-
             <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-6">
+              <div className="flex items-center gap-2 mb-3">
+                <p className="text-xs font-medium text-slate-500">Approving as:</p>
+                <p className="text-sm font-semibold text-slate-900">
+                  {user?.user_metadata?.name || user?.email?.split('@')[0] || 'Unknown User'}
+                </p>
+              </div>
               <p className="text-sm text-slate-700">
                 <strong>{certificate.vendor.name}</strong> will be notified via email that their certificate has been approved for <strong>{certificate.event.name}</strong>.
               </p>
@@ -428,7 +415,7 @@ export default function CertificateReviewPage() {
               </button>
               <button
                 onClick={handleApprove}
-                disabled={!approverName.trim() || submitting}
+                disabled={submitting}
                 className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitting ? 'Approving...' : 'Confirm Approval'}

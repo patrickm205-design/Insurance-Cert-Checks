@@ -178,24 +178,50 @@ Return ONLY the JSON object, no additional text or explanation.`,
           console.error('Failed to upload PDF:', uploadErr);
         }
 
-        // Save certificate (always create new version, trigger will handle versioning)
+        // Extract expiration date from certificate data
+        let expirationDate: string | null = null;
+        if (extractedData.expirationDate && extractedData.expirationDate !== 'Not found') {
+          try {
+            const date = new Date(extractedData.expirationDate);
+            if (!isNaN(date.getTime())) {
+              expirationDate = date.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+            }
+          } catch (e) {
+            console.error('Failed to parse expiration date:', e);
+          }
+        }
+
+        // Save certificate (vendor-centric, not tied to event directly)
         const { data: certificate, error: certError } = await supabase
           .from('certificates')
           .insert({
             vendor_id: vendorId,
-            event_id: eventId,
             status,
             confidence_score: confidence,
             extracted_data: extractedData,
             validation_issues: validationIssues,
             human_approved: false,
             pdf_url: pdfUrl,
+            expiration_date: expirationDate,
           })
           .select('id')
           .single();
 
         if (certError) throw certError;
         certificateId = certificate!.id;
+
+        // Link certificate to event
+        const { error: linkError } = await supabase
+          .from('event_certificates')
+          .insert({
+            event_id: eventId,
+            certificate_id: certificateId,
+            auto_populated: false,
+          });
+
+        if (linkError) {
+          console.error('Failed to link certificate to event:', linkError);
+        }
 
         console.log('Certificate saved to database:', certificateId);
       } catch (dbError) {
