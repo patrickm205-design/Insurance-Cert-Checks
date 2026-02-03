@@ -9,24 +9,45 @@ export async function GET(
     const { id } = await params;
 
     // Fetch certificate with vendor details
-    const { data: certificate, error } = await supabase
+    const { data: certificate, error: certError } = await supabase
       .from('certificates')
       .select(`
         *,
-        vendor:vendors(*),
-        event:events(*)
+        vendor:vendors(*)
       `)
       .eq('id', id)
       .single();
 
-    if (error || !certificate) {
+    if (certError || !certificate) {
       return NextResponse.json(
         { error: 'Certificate not found' },
         { status: 404 }
       );
     }
 
-    return NextResponse.json(certificate);
+    // Fetch associated events through junction table
+    const { data: eventCerts } = await supabase
+      .from('event_certificates')
+      .select('event_id')
+      .eq('certificate_id', id);
+
+    const eventIds = eventCerts?.map(ec => ec.event_id) || [];
+
+    let events: any[] = [];
+    if (eventIds.length > 0) {
+      const { data: eventData } = await supabase
+        .from('events')
+        .select('id, name')
+        .in('id', eventIds);
+      events = eventData || [];
+    }
+
+    // Return certificate with events array (for compatibility, use first event as primary)
+    return NextResponse.json({
+      ...certificate,
+      events,
+      event: events.length > 0 ? events[0] : null,
+    });
   } catch (error) {
     console.error('Failed to fetch certificate:', error);
     return NextResponse.json(
