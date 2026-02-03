@@ -37,15 +37,28 @@ export default function DashboardPage() {
         // Fetch certificate counts for each event
         const eventsWithVendors = await Promise.all(
           (eventsData || []).map(async (event) => {
-            const { data: certs } = await supabase
-              .from('certificates')
-              .select('status, human_approved')
-              .eq('event_id', event.id)
-              .eq('is_latest', true);
+            // Get certificates for this event via junction table
+            const { data: eventCerts } = await supabase
+              .from('event_certificates')
+              .select('certificate_id')
+              .eq('event_id', event.id);
 
-            const approved = certs?.filter((c) => c.human_approved).length || 0;
-            const issues = certs?.filter((c) => c.status === 'red' && !c.human_approved).length || 0;
-            const needsReview = certs?.filter((c) => !c.human_approved && c.status !== 'red').length || 0;
+            const certificateIds = eventCerts?.map(ec => ec.certificate_id) || [];
+
+            let approved = 0;
+            let issues = 0;
+            let needsReview = 0;
+
+            if (certificateIds.length > 0) {
+              const { data: certs } = await supabase
+                .from('certificates')
+                .select('status, human_approved')
+                .in('id', certificateIds);
+
+              approved = certs?.filter((c) => c.human_approved).length || 0;
+              issues = certs?.filter((c) => c.status === 'red' && !c.human_approved).length || 0;
+              needsReview = certs?.filter((c) => !c.human_approved && c.status !== 'red').length || 0;
+            }
 
             return {
               id: event.id,
