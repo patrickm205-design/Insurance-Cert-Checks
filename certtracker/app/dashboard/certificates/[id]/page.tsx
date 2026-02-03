@@ -27,6 +27,7 @@ type Certificate = {
   confidence_score: number;
   human_approved: boolean;
   created_at: string;
+  pdf_url: string | null;
 };
 
 
@@ -38,6 +39,7 @@ export default function CertificateReviewPage() {
   const [certificate, setCertificate] = useState<Certificate | null>(null);
   const [loading, setLoading] = useState(true);
   const [notes, setNotes] = useState('');
+  const [approverName, setApproverName] = useState('');
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -65,6 +67,11 @@ export default function CertificateReviewPage() {
   const handleApprove = async () => {
     if (!certificate) return;
 
+    if (!approverName.trim()) {
+      alert('Please enter your name to approve this certificate');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const response = await fetch(`/api/certificates/${id}`, {
@@ -72,7 +79,7 @@ export default function CertificateReviewPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           human_approved: true,
-          approved_by: 'Venue Manager',
+          approved_by: approverName.trim(),
         }),
       });
 
@@ -81,7 +88,7 @@ export default function CertificateReviewPage() {
       }
 
       alert(`Certificate approved for ${certificate.vendor.name}`);
-      router.push(`/dashboard/events/1`);
+      router.push(`/dashboard/certificates`);
     } catch (error) {
       console.error('Error approving certificate:', error);
       alert('Failed to approve certificate. Please try again.');
@@ -115,7 +122,7 @@ export default function CertificateReviewPage() {
       }
 
       alert(`Certificate rejected. Vendor will be notified: "${notes}"`);
-      router.push(`/dashboard/events/1`);
+      router.push(`/dashboard/certificates`);
     } catch (error) {
       console.error('Error rejecting certificate:', error);
       alert('Failed to reject certificate. Please try again.');
@@ -231,17 +238,22 @@ export default function CertificateReviewPage() {
             </div>
           </div>
           <div className="p-6">
-            {/* PDF Viewer Placeholder - In production, use react-pdf or iframe */}
-            <div className="bg-slate-100 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center" style={{ height: '600px' }}>
-              <div className="text-center">
-                <FileText className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-                <p className="text-sm font-medium text-slate-700 mb-2">PDF Viewer</p>
-                <p className="text-xs text-slate-500 mb-4">ACORD 25 Certificate of Insurance</p>
-                <button className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                  Download PDF
-                </button>
+            {certificate.pdf_url ? (
+              <iframe
+                src={certificate.pdf_url}
+                className="w-full rounded-lg border border-slate-300"
+                style={{ height: '600px' }}
+                title="Certificate PDF"
+              />
+            ) : (
+              <div className="bg-slate-100 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center" style={{ height: '600px' }}>
+                <div className="text-center">
+                  <FileText className="w-16 h-16 text-slate-400 mx-auto mb-4" />
+                  <p className="text-sm font-medium text-slate-700 mb-2">PDF Not Available</p>
+                  <p className="text-xs text-slate-500">Certificate document was not stored</p>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -378,6 +390,24 @@ export default function CertificateReviewPage() {
                 <p className="text-sm text-slate-600">This action will lock the certificate as approved</p>
               </div>
             </div>
+
+            {/* Approver Name Input */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Your Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={approverName}
+                onChange={(e) => setApproverName(e.target.value)}
+                placeholder="Enter your name (e.g., Amanda)"
+                className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                This will be recorded as the person who approved this certificate
+              </p>
+            </div>
+
             <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-6">
               <p className="text-sm text-slate-700">
                 <strong>{certificate.vendor.name}</strong> will be notified via email that their certificate has been approved for <strong>{certificate.event.name}</strong>.
@@ -398,9 +428,10 @@ export default function CertificateReviewPage() {
               </button>
               <button
                 onClick={handleApprove}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                disabled={!approverName.trim() || submitting}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Confirm Approval
+                {submitting ? 'Approving...' : 'Confirm Approval'}
               </button>
             </div>
           </div>

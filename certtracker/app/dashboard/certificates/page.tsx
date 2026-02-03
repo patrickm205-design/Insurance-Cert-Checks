@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase';
 type Certificate = {
   id: string;
   vendor: {
+    id: string;
     name: string;
     email: string;
     type: string;
@@ -21,12 +22,20 @@ type Certificate = {
   confidence_score: number;
   human_approved: boolean;
   created_at: string;
+  version: number;
+  is_latest: boolean;
+  vendor_id: string;
+  event_id: string;
 };
 
 export default function AllCertificatesPage() {
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCertificate, setSelectedCertificate] = useState<Certificate | null>(null);
+  const [versionHistory, setVersionHistory] = useState<Certificate[]>([]);
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   useEffect(() => {
     async function fetchCertificates() {
@@ -38,6 +47,7 @@ export default function AllCertificatesPage() {
             vendor:vendors(*),
             event:events(*)
           `)
+          .eq('is_latest', true)
           .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -52,6 +62,33 @@ export default function AllCertificatesPage() {
 
     fetchCertificates();
   }, []);
+
+  const fetchVersionHistory = async (cert: Certificate) => {
+    setSelectedCertificate(cert);
+    setLoadingHistory(true);
+    setShowVersionHistory(true);
+
+    try {
+      const { data, error } = await supabase
+        .from('certificates')
+        .select(`
+          *,
+          vendor:vendors(*),
+          event:events(*)
+        `)
+        .eq('vendor_id', cert.vendor_id)
+        .eq('event_id', cert.event_id)
+        .order('version', { ascending: false });
+
+      if (error) throw error;
+
+      setVersionHistory(data || []);
+    } catch (error) {
+      console.error('Error fetching version history:', error);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
 
   const filteredCertificates = certificates.filter(
     (cert) =>
@@ -149,6 +186,9 @@ export default function AllCertificatesPage() {
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">
+                  Version
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">
                   Confidence
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">
@@ -179,6 +219,14 @@ export default function AllCertificatesPage() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-slate-900">v{cert.version}</span>
+                      {cert.is_latest && (
+                        <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded">Latest</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
                       <div className="flex-1 bg-slate-100 rounded-full h-2 w-20">
                         <div
                           className={`h-full rounded-full ${
@@ -204,17 +252,135 @@ export default function AllCertificatesPage() {
                     </p>
                   </td>
                   <td className="px-6 py-4">
-                    <Link
-                      href={`/dashboard/certificates/${cert.id}`}
-                      className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
-                    >
-                      Review
-                    </Link>
+                    <div className="flex items-center gap-3">
+                      <Link
+                        href={`/dashboard/certificates/${cert.id}`}
+                        className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
+                      >
+                        Review
+                      </Link>
+                      <button
+                        onClick={() => fetchVersionHistory(cert)}
+                        className="text-sm font-medium text-slate-600 hover:text-slate-900"
+                      >
+                        History
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Version History Modal */}
+      {showVersionHistory && selectedCertificate && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-4xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold text-slate-900">Certificate Version History</h2>
+                  <p className="text-sm text-slate-600 mt-1">
+                    {selectedCertificate.vendor.name} • {selectedCertificate.event.name}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowVersionHistory(false)}
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {loadingHistory ? (
+                <div className="text-center py-12">
+                  <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                  <p className="text-sm text-slate-600">Loading version history...</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {versionHistory.map((version) => (
+                    <div
+                      key={version.id}
+                      className={`border rounded-lg p-4 ${
+                        version.is_latest
+                          ? 'border-indigo-300 bg-indigo-50'
+                          : 'border-slate-200 bg-white'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg font-semibold text-slate-900">Version {version.version}</span>
+                            {version.is_latest && (
+                              <span className="text-xs bg-indigo-600 text-white px-2 py-1 rounded font-medium">
+                                Current
+                              </span>
+                            )}
+                          </div>
+                          <TrafficLightBadge
+                            status={version.status}
+                            humanApproved={version.human_approved}
+                          />
+                        </div>
+                        <Link
+                          href={`/dashboard/certificates/${version.id}`}
+                          className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
+                        >
+                          View Details
+                        </Link>
+                      </div>
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div>
+                          <p className="text-xs text-slate-500 mb-1">Uploaded</p>
+                          <p className="text-slate-900 font-medium">
+                            {new Date(version.created_at).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                            })}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500 mb-1">Confidence</p>
+                          <p className="text-slate-900 font-medium">{version.confidence_score}%</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500 mb-1">Approval Status</p>
+                          <p className="text-slate-900 font-medium">
+                            {version.human_approved ? 'Approved' : 'Pending'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500 mb-1">Status</p>
+                          <p className="text-slate-900 font-medium capitalize">{version.status}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-slate-200 bg-slate-50">
+              <button
+                onClick={() => setShowVersionHistory(false)}
+                className="bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

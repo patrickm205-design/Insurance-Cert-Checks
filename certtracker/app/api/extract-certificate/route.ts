@@ -152,10 +152,36 @@ Return ONLY the JSON object, no additional text or explanation.`,
           vendorId = newVendor!.id;
         }
 
-        // Save certificate
+        // Upload PDF to Supabase Storage
+        let pdfUrl: string | null = null;
+        try {
+          const fileName = `${vendorId}-${eventId}-${Date.now()}.pdf`;
+          const pdfBuffer = Buffer.from(pdfBase64, 'base64');
+
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('certificates')
+            .upload(fileName, pdfBuffer, {
+              contentType: 'application/pdf',
+              upsert: false,
+            });
+
+          if (uploadError) {
+            console.error('PDF upload error:', uploadError);
+          } else {
+            // Get public URL
+            const { data: urlData } = supabase.storage
+              .from('certificates')
+              .getPublicUrl(fileName);
+            pdfUrl = urlData.publicUrl;
+          }
+        } catch (uploadErr) {
+          console.error('Failed to upload PDF:', uploadErr);
+        }
+
+        // Save certificate (always create new version, trigger will handle versioning)
         const { data: certificate, error: certError } = await supabase
           .from('certificates')
-          .upsert({
+          .insert({
             vendor_id: vendorId,
             event_id: eventId,
             status,
@@ -163,8 +189,7 @@ Return ONLY the JSON object, no additional text or explanation.`,
             extracted_data: extractedData,
             validation_issues: validationIssues,
             human_approved: false,
-          }, {
-            onConflict: 'vendor_id,event_id'
+            pdf_url: pdfUrl,
           })
           .select('id')
           .single();
