@@ -3,92 +3,84 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ArrowLeft, Calendar, User2, MapPin, Send, Link as LinkIcon } from 'lucide-react';
-import { useState } from 'react';
-import VendorTable from '@/components/VendorTable';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 
-// Mock data for the Johnson-Smith Wedding
-const eventData = {
-  '1': {
-    id: '1',
-    name: 'Johnson-Smith Wedding',
-    type: 'Wedding',
-    date: 'Apr 15, 2025',
-    client: 'Emily Johnson & Michael Smith',
-    venue: 'Grand Ballroom at The Plaza',
-    vendors: [
-      {
-        id: 'v1',
-        name: 'Apex Catering',
-        email: 'contact@apexcatering.com',
-        type: 'Caterer',
-        status: 'green' as const,
-        humanApproved: true,
-        policyExpires: 'Mar 15, 2026',
-        coverage: '$2M',
-      },
-      {
-        id: 'v2',
-        name: 'Summit AV Productions',
-        email: 'bookings@summitav.com',
-        type: 'AV Company',
-        status: 'yellow' as const,
-        policyExpires: 'May 1, 2025',
-        coverage: '$1M',
-        issues: [
-          'Policy expires 16 days after event',
-          'Additional Insured unclear (68% confidence)',
-        ],
-      },
-      {
-        id: 'v3',
-        name: 'Bella Flora Design',
-        email: 'info@bellafloradesign.com',
-        type: 'Florist',
-        status: 'green' as const,
-        humanApproved: true,
-        policyExpires: 'Jan 20, 2026',
-        coverage: '$1M',
-      },
-      {
-        id: 'v4',
-        name: 'Harmonic Entertainment',
-        email: 'dj@harmonicent.com',
-        type: 'DJ',
-        status: 'red' as const,
-        policyExpires: 'Dec 31, 2025',
-        coverage: '$500K',
-        issues: [
-          'GL below $1M requirement',
-          'No Liquor Liability',
-          'Wrong Certificate Holder',
-        ],
-      },
-      {
-        id: 'v5',
-        name: 'Prestige Photography',
-        email: 'studio@prestigephoto.com',
-        type: 'Photographer',
-        status: 'green' as const,
-        humanApproved: true,
-        policyExpires: 'Jun 30, 2026',
-        coverage: '$2M',
-      },
-      {
-        id: 'v6',
-        name: 'Artisan Cake Studio',
-        email: 'orders@artisancakes.com',
-        type: 'Baker',
-        status: 'gray' as const,
-      },
-    ],
-  },
+type Event = {
+  id: string;
+  name: string;
+  type: string;
+  date: string;
+  client: string;
+  venue: string;
 };
 
 export default function EventDetailPage() {
   const params = useParams();
   const id = params.id as string;
   const [copied, setCopied] = useState(false);
-  const event = eventData[id as keyof typeof eventData];
+  const [event, setEvent] = useState<Event | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    approved: 0,
+    needsReview: 0,
+    issues: 0,
+    notUploaded: 0,
+  });
+
+  useEffect(() => {
+    async function fetchEvent() {
+      try {
+        // Fetch event
+        const { data: eventData, error: eventError } = await supabase
+          .from('events')
+          .select('*')
+          .eq('id', id)
+          .single();
+
+        if (eventError || !eventData) {
+          console.error('Event not found:', eventError);
+          setLoading(false);
+          return;
+        }
+
+        setEvent(eventData);
+
+        // Fetch certificates for this event
+        const { data: eventCerts } = await supabase
+          .from('event_certificates')
+          .select('certificate_id')
+          .eq('event_id', id);
+
+        const certificateIds = eventCerts?.map(ec => ec.certificate_id) || [];
+
+        if (certificateIds.length > 0) {
+          const { data: certs } = await supabase
+            .from('certificates')
+            .select('status, human_approved')
+            .in('id', certificateIds);
+
+          const approved = certs?.filter((c) => c.human_approved).length || 0;
+          const issues = certs?.filter((c) => c.status === 'red' && !c.human_approved).length || 0;
+          const needsReview = certs?.filter((c) => !c.human_approved && c.status !== 'red').length || 0;
+
+          setStats({
+            approved,
+            needsReview,
+            issues,
+            notUploaded: 0,
+          });
+        }
+
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching event:', error);
+        setLoading(false);
+      }
+    }
+
+    fetchEvent();
+  }, [id]);
 
   const copyUploadLink = () => {
     const uploadUrl = `${window.location.origin}/upload/${id}`;
@@ -97,6 +89,17 @@ export default function EventDetailPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  if (loading) {
+    return (
+      <div className="p-8">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-sm text-slate-600">Loading event...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!event) {
     return (
       <div className="p-8">
@@ -104,11 +107,6 @@ export default function EventDetailPage() {
       </div>
     );
   }
-
-  const approved = event.vendors.filter((v) => v.status === 'green' && v.humanApproved).length;
-  const needsReview = event.vendors.filter((v) => v.status === 'yellow' || (v.status === 'green' && !v.humanApproved)).length;
-  const issues = event.vendors.filter((v) => v.status === 'red').length;
-  const notUploaded = event.vendors.filter((v) => v.status === 'gray').length;
 
   return (
     <div className="p-8">
@@ -175,7 +173,7 @@ export default function EventDetailPage() {
           <div className="flex items-center gap-3">
             <div className="w-3 h-3 rounded-full bg-emerald-500" />
             <div>
-              <p className="text-2xl font-semibold text-slate-900">{approved}</p>
+              <p className="text-2xl font-semibold text-slate-900">{stats.approved}</p>
               <p className="text-sm text-slate-500">Approved</p>
             </div>
           </div>
@@ -185,7 +183,7 @@ export default function EventDetailPage() {
           <div className="flex items-center gap-3">
             <div className="w-3 h-3 rounded-full bg-amber-500" />
             <div>
-              <p className="text-2xl font-semibold text-slate-900">{needsReview}</p>
+              <p className="text-2xl font-semibold text-slate-900">{stats.needsReview}</p>
               <p className="text-sm text-slate-500">Needs Review</p>
             </div>
           </div>
@@ -195,7 +193,7 @@ export default function EventDetailPage() {
           <div className="flex items-center gap-3">
             <div className="w-3 h-3 rounded-full bg-red-500" />
             <div>
-              <p className="text-2xl font-semibold text-slate-900">{issues}</p>
+              <p className="text-2xl font-semibold text-slate-900">{stats.issues}</p>
               <p className="text-sm text-slate-500">Issues Found</p>
             </div>
           </div>
@@ -205,7 +203,7 @@ export default function EventDetailPage() {
           <div className="flex items-center gap-3">
             <div className="w-3 h-3 rounded-full bg-slate-400" />
             <div>
-              <p className="text-2xl font-semibold text-slate-900">{notUploaded}</p>
+              <p className="text-2xl font-semibold text-slate-900">{stats.notUploaded}</p>
               <p className="text-sm text-slate-500">Not Uploaded</p>
             </div>
           </div>
@@ -239,7 +237,15 @@ export default function EventDetailPage() {
       {/* Vendor Table */}
       <div>
         <h2 className="text-lg font-semibold text-slate-900 mb-4">Vendor Certificates</h2>
-        <VendorTable vendors={event.vendors} eventId={id} />
+        <div className="bg-white border border-slate-200 rounded-xl p-12 text-center">
+          <p className="text-slate-600 mb-4">Upload certificates using the link above, then view them in "All Certificates"</p>
+          <Link
+            href="/dashboard/certificates"
+            className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          >
+            View All Certificates
+          </Link>
+        </div>
       </div>
     </div>
   );
