@@ -30,10 +30,12 @@ export default function AllCertificatesPage() {
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     async function fetchCertificates() {
       try {
+        setLoading(true);
         // Fetch all certificates with vendor info
         const { data: certs, error: certsError } = await supabase
           .from('certificates')
@@ -80,7 +82,16 @@ export default function AllCertificatesPage() {
     }
 
     fetchCertificates();
-  }, []);
+
+    // Listen for window focus to refetch data when returning to page
+    const handleFocus = () => {
+      setRefreshKey(prev => prev + 1);
+      fetchCertificates();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [refreshKey]);
 
   const filteredCertificates = certificates.filter(
     (cert) =>
