@@ -29,121 +29,112 @@ type Certificate = {
   created_at: string;
 };
 
-// Mock certificate data - fallback for testing
-const certificateData: Record<string, {
-  vendorName: string;
-  vendorEmail: string;
-  eventId: string;
-  eventName: string;
-  status: 'green' | 'yellow' | 'red';
-  uploadDate: string;
-  pdfUrl: string;
-  extractedData: {
-    insuranceCompany: string;
-    policyNumber: string;
-    effectiveDate: string;
-    expirationDate: string;
-    generalLiability: string;
-    aggregateLimit: string;
-    certificateHolder: string;
-    additionalInsured: string;
-    description: string;
-  };
-  validationIssues: Array<{
-    severity: 'error' | 'warning' | 'info';
-    field: string;
-    issue: string;
-    detail: string;
-  }>;
-  aiConfidence: number;
-}> = {
-  'cert1': {
-    vendorName: 'Summit AV Productions',
-    vendorEmail: 'bookings@summitav.com',
-    eventId: '1',
-    eventName: 'Johnson-Smith Wedding',
-    status: 'yellow',
-    uploadDate: 'Feb 1, 2025',
-    pdfUrl: '/sample-certificate.pdf', // Mock URL
-    extractedData: {
-      insuranceCompany: 'American Insurance Co',
-      policyNumber: 'GL-2025-789456',
-      effectiveDate: 'Jan 1, 2025',
-      expirationDate: 'May 1, 2025',
-      generalLiability: '$1,000,000',
-      aggregateLimit: '$2,000,000',
-      certificateHolder: 'Grand Ballroom at The Plaza',
-      additionalInsured: 'Yes (identified)',
-      description: 'General Liability coverage for AV services at wedding event',
-    },
-    validationIssues: [
-      {
-        severity: 'warning',
-        field: 'Expiration Date',
-        issue: 'Policy expires 16 days after event',
-        detail: 'Event date is Apr 15, 2025. Policy expires May 1, 2025. Recommend requesting extended coverage.',
-      },
-      {
-        severity: 'warning',
-        field: 'Additional Insured',
-        issue: 'Additional Insured language unclear',
-        detail: 'AI confidence: 68%. Manual verification recommended to confirm venue is named as additional insured.',
-      },
-    ],
-    aiConfidence: 87,
-  },
-  'cert2': {
-    vendorName: 'Harmonic Entertainment',
-    vendorEmail: 'dj@harmonicent.com',
-    eventId: '1',
-    eventName: 'Johnson-Smith Wedding',
-    status: 'red',
-    uploadDate: 'Jan 28, 2025',
-    pdfUrl: '/sample-certificate.pdf',
-    extractedData: {
-      insuranceCompany: 'Budget Insurance Group',
-      policyNumber: 'CGL-456123-25',
-      effectiveDate: 'Jan 1, 2025',
-      expirationDate: 'Dec 31, 2025',
-      generalLiability: '$500,000',
-      aggregateLimit: '$1,000,000',
-      certificateHolder: 'Plaza Events LLC',
-      additionalInsured: 'No',
-      description: 'DJ and entertainment services',
-    },
-    validationIssues: [
-      {
-        severity: 'error',
-        field: 'General Liability',
-        issue: 'Coverage below minimum requirement',
-        detail: 'Required: $1,000,000. Provided: $500,000. Venue requires minimum $1M per occurrence.',
-      },
-      {
-        severity: 'error',
-        field: 'Liquor Liability',
-        issue: 'No Liquor Liability coverage found',
-        detail: 'Event involves alcohol service. Liquor liability coverage is required.',
-      },
-      {
-        severity: 'error',
-        field: 'Certificate Holder',
-        issue: 'Incorrect Certificate Holder name',
-        detail: 'Certificate shows "Plaza Events LLC" but should be "Grand Ballroom at The Plaza".',
-      },
-    ],
-    aiConfidence: 94,
-  },
-};
 
 export default function CertificateReviewPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
-  const certificate = certificateData[id];
 
+  const [certificate, setCertificate] = useState<Certificate | null>(null);
+  const [loading, setLoading] = useState(true);
   const [notes, setNotes] = useState('');
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  // Fetch certificate from API
+  useEffect(() => {
+    async function fetchCertificate() {
+      try {
+        const response = await fetch(`/api/certificates/${id}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch certificate');
+        }
+        const data = await response.json();
+        setCertificate(data);
+      } catch (error) {
+        console.error('Error fetching certificate:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchCertificate();
+  }, [id]);
+
+  const handleApprove = async () => {
+    if (!certificate) return;
+
+    setSubmitting(true);
+    try {
+      const response = await fetch(`/api/certificates/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          human_approved: true,
+          approved_by: 'Venue Manager',
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to approve certificate');
+      }
+
+      alert(`Certificate approved for ${certificate.vendor.name}`);
+      router.push(`/dashboard/events/1`);
+    } catch (error) {
+      console.error('Error approving certificate:', error);
+      alert('Failed to approve certificate. Please try again.');
+    } finally {
+      setSubmitting(false);
+      setShowApproveModal(false);
+    }
+  };
+
+  const handleReject = async () => {
+    if (!certificate) return;
+
+    if (!notes.trim()) {
+      alert('Please add notes explaining why this certificate is being rejected');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const response = await fetch(`/api/certificates/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          human_approved: false,
+          rejection_notes: notes,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to reject certificate');
+      }
+
+      alert(`Certificate rejected. Vendor will be notified: "${notes}"`);
+      router.push(`/dashboard/events/1`);
+    } catch (error) {
+      console.error('Error rejecting certificate:', error);
+      alert('Failed to reject certificate. Please try again.');
+    } finally {
+      setSubmitting(false);
+      setShowRejectModal(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="p-8">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-sm text-slate-600">Loading certificate...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!certificate) {
     return (
@@ -151,22 +142,6 @@ export default function CertificateReviewPage() {
         <p className="text-slate-700">Certificate not found</p>
       </div>
     );
-  }
-
-  const handleApprove = () => {
-    // In Phase 6, this will update the database
-    alert(`Certificate approved for ${certificate.vendor.name}`);
-    router.push(`/dashboard/events/${certificate.event.id}`);
-  };
-
-  const handleReject = () => {
-    if (!notes.trim()) {
-      alert('Please add notes explaining why this certificate is being rejected');
-      return;
-    }
-    // In Phase 6, this will update the database and send email to vendor
-    alert(`Certificate rejected for ${certificate.vendor.name}. Vendor will be notified via email.`);
-    router.push(`/dashboard/events/${certificate.event.id}`);
   };
 
   const errorCount = certificate.validation_issues.filter(i => i.severity === 'error').length;
