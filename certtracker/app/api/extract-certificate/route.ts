@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { supabase } from '@/lib/supabase';
+import { supabaseServer } from '@/lib/supabase-server';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -152,13 +153,13 @@ Return ONLY the JSON object, no additional text or explanation.`,
           vendorId = newVendor!.id;
         }
 
-        // Upload PDF to Supabase Storage
+        // Upload PDF to Supabase Storage using service role key
         let pdfUrl: string | null = null;
         try {
           const fileName = `${vendorId}-${eventId}-${Date.now()}.pdf`;
           const pdfBuffer = Buffer.from(pdfBase64, 'base64');
 
-          const { data: uploadData, error: uploadError } = await supabase.storage
+          const { data: uploadData, error: uploadError } = await supabaseServer.storage
             .from('certificates')
             .upload(fileName, pdfBuffer, {
               contentType: 'application/pdf',
@@ -167,12 +168,14 @@ Return ONLY the JSON object, no additional text or explanation.`,
 
           if (uploadError) {
             console.error('PDF upload error:', uploadError);
+            console.error('Upload error details:', JSON.stringify(uploadError, null, 2));
           } else {
             // Get public URL
-            const { data: urlData } = supabase.storage
+            const { data: urlData } = supabaseServer.storage
               .from('certificates')
               .getPublicUrl(fileName);
             pdfUrl = urlData.publicUrl;
+            console.log('PDF uploaded successfully:', pdfUrl);
           }
         } catch (uploadErr) {
           console.error('Failed to upload PDF:', uploadErr);
