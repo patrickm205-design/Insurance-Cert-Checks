@@ -155,8 +155,8 @@ export default function CertificateReviewPage() {
 
   const handleApprove = () => {
     // In Phase 6, this will update the database
-    alert(`Certificate approved for ${certificate.vendorName}`);
-    router.push(`/dashboard/events/${certificate.eventId}`);
+    alert(`Certificate approved for ${certificate.vendor.name}`);
+    router.push(`/dashboard/events/${certificate.event.id}`);
   };
 
   const handleReject = () => {
@@ -165,18 +165,18 @@ export default function CertificateReviewPage() {
       return;
     }
     // In Phase 6, this will update the database and send email to vendor
-    alert(`Certificate rejected for ${certificate.vendorName}. Vendor will be notified via email.`);
-    router.push(`/dashboard/events/${certificate.eventId}`);
+    alert(`Certificate rejected for ${certificate.vendor.name}. Vendor will be notified via email.`);
+    router.push(`/dashboard/events/${certificate.event.id}`);
   };
 
-  const errorCount = certificate.validationIssues.filter(i => i.severity === 'error').length;
-  const warningCount = certificate.validationIssues.filter(i => i.severity === 'warning').length;
+  const errorCount = certificate.validation_issues.filter(i => i.severity === 'error').length;
+  const warningCount = certificate.validation_issues.filter(i => i.severity === 'warning').length;
 
   return (
     <div className="p-8">
       {/* Header */}
       <Link
-        href={`/dashboard/events/${certificate.eventId}`}
+        href={`/dashboard/events/${certificate.event.id}`}
         className="inline-flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-700 hover:underline mb-6"
       >
         <ArrowLeft className="w-4 h-4" />
@@ -187,9 +187,11 @@ export default function CertificateReviewPage() {
         <div>
           <h1 className="text-2xl font-semibold text-slate-900 mb-2">Certificate Review</h1>
           <p className="text-sm text-slate-600">
-            <strong>{certificate.vendorName}</strong> • {certificate.eventName}
+            <strong>{certificate.vendor.name}</strong> • {certificate.event.name}
           </p>
-          <p className="text-sm text-slate-500">Uploaded {certificate.uploadDate}</p>
+          <p className="text-sm text-slate-500">
+            Uploaded {new Date(certificate.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+          </p>
         </div>
         <TrafficLightBadge status={certificate.status} />
       </div>
@@ -205,16 +207,16 @@ export default function CertificateReviewPage() {
             </div>
           </div>
           <div className="text-right">
-            <p className="text-2xl font-semibold text-slate-900">{certificate.aiConfidence}%</p>
+            <p className="text-2xl font-semibold text-slate-900">{certificate.confidence_score}%</p>
             <p className="text-xs text-slate-500">
-              {certificate.aiConfidence >= 90 ? 'High' : certificate.aiConfidence >= 75 ? 'Medium' : 'Low'} Confidence
+              {certificate.confidence_score >= 90 ? 'High' : certificate.confidence_score >= 75 ? 'Medium' : 'Low'} Confidence
             </p>
           </div>
         </div>
       </div>
 
       {/* Validation Summary */}
-      {certificate.validationIssues.length > 0 && (
+      {certificate.validation_issues.length > 0 && (
         <div className={`border rounded-xl p-6 mb-6 ${
           errorCount > 0
             ? 'bg-red-50 border-red-200'
@@ -276,53 +278,53 @@ export default function CertificateReviewPage() {
             <div className="space-y-4">
               <div>
                 <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Insurance Company</label>
-                <p className="text-sm text-slate-900 mt-1">{certificate.extractedData.insuranceCompany}</p>
+                <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.insuranceCompany}</p>
               </div>
               <div>
                 <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Policy Number</label>
-                <p className="text-sm text-slate-900 mt-1">{certificate.extractedData.policyNumber}</p>
+                <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.policyNumber}</p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Effective Date</label>
-                  <p className="text-sm text-slate-900 mt-1">{certificate.extractedData.effectiveDate}</p>
+                  <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.effectiveDate}</p>
                 </div>
                 <div>
                   <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Expiration Date</label>
-                  <p className="text-sm text-slate-900 mt-1">{certificate.extractedData.expirationDate}</p>
+                  <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.expirationDate}</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">General Liability</label>
-                  <p className="text-sm text-slate-900 mt-1">{certificate.extractedData.generalLiability}</p>
+                  <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.generalLiability}</p>
                 </div>
                 <div>
                   <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Aggregate Limit</label>
-                  <p className="text-sm text-slate-900 mt-1">{certificate.extractedData.aggregateLimit}</p>
+                  <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.aggregateLimit}</p>
                 </div>
               </div>
               <div>
                 <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Certificate Holder</label>
-                <p className="text-sm text-slate-900 mt-1">{certificate.extractedData.certificateHolder}</p>
+                <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.certificateHolder}</p>
               </div>
               <div>
                 <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Additional Insured</label>
-                <p className="text-sm text-slate-900 mt-1">{certificate.extractedData.additionalInsured}</p>
+                <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.additionalInsured}</p>
               </div>
               <div>
                 <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Description</label>
-                <p className="text-sm text-slate-900 mt-1">{certificate.extractedData.description}</p>
+                <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.description}</p>
               </div>
             </div>
           </div>
 
           {/* Validation Issues */}
-          {certificate.validationIssues.length > 0 && (
+          {certificate.validation_issues.length > 0 && (
             <div className="bg-white border border-slate-200 rounded-xl p-6">
               <h2 className="text-lg font-semibold text-slate-900 mb-4">Validation Issues</h2>
               <div className="space-y-4">
-                {certificate.validationIssues.map((issue, index) => (
+                {certificate.validation_issues.map((issue, index) => (
                   <div
                     key={index}
                     className={`border-l-4 pl-4 py-2 ${
@@ -403,7 +405,7 @@ export default function CertificateReviewPage() {
             </div>
             <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-6">
               <p className="text-sm text-slate-700">
-                <strong>{certificate.vendorName}</strong> will be notified via email that their certificate has been approved for <strong>{certificate.eventName}</strong>.
+                <strong>{certificate.vendor.name}</strong> will be notified via email that their certificate has been approved for <strong>{certificate.event.name}</strong>.
               </p>
               {notes && (
                 <div className="mt-3 pt-3 border-t border-slate-200">
@@ -452,7 +454,7 @@ export default function CertificateReviewPage() {
             )}
             <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-6">
               <p className="text-sm text-slate-700 mb-3">
-                <strong>{certificate.vendorName}</strong> will receive an email with:
+                <strong>{certificate.vendor.name}</strong> will receive an email with:
               </p>
               <ul className="text-sm text-slate-600 space-y-1">
                 <li>• Rejection notification</li>
