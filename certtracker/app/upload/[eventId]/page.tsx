@@ -34,6 +34,7 @@ export default function VendorUploadPage() {
   const [error, setError] = useState('');
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
+  const [uploadResult, setUploadResult] = useState<any>(null);
 
   // Fetch event from database
   useEffect(() => {
@@ -193,10 +194,10 @@ export default function VendorUploadPage() {
       }
 
       const result = await response.json();
+      setUploadResult(result);
 
       setUploadProgress(90);
 
-      // In Phase 6, this would save to Supabase database
       console.log('Extraction result:', result);
 
       setUploadProgress(100);
@@ -270,6 +271,12 @@ export default function VendorUploadPage() {
               <li>• If any issues are found, we'll contact you directly</li>
             </ul>
           </div>
+          {uploadResult?.pdfUploadError && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4 text-left">
+              <p className="text-sm font-semibold text-red-800 mb-1">PDF Storage Error</p>
+              <p className="text-xs text-red-700">{uploadResult.pdfUploadError}</p>
+            </div>
+          )}
           <p className="text-xs text-slate-500">
             You can close this window now.
           </p>
