@@ -247,47 +247,185 @@ export default function CertificateReviewPage() {
 
       {/* Details below PDF */}
       <div className="space-y-6">
-        {/* Extracted Data - grid layout */}
+        {/* Extracted Data */}
         <div className="bg-white border border-slate-200 rounded-xl p-6">
-          <h2 className="text-lg font-semibold text-slate-900 mb-4">Extracted Certificate Data</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-            <div>
-              <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Insurance Company</label>
-              <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.insuranceCompany}</p>
+          <h2 className="text-lg font-semibold text-slate-900 mb-5">Extracted Certificate Data</h2>
+
+          {'gl_policy_number' in certificate.extracted_data ? (
+            /* New ACORD 25 schema */
+            <div className="space-y-6">
+              {/* Identity */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Building2 className="w-4 h-4 text-slate-500" />
+                  <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Identity</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Producer Name</label>
+                    <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.producer_name || '—'}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Insured Name</label>
+                    <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.insured_name || '—'}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Certificate Holder</label>
+                    <p className="text-sm text-slate-900 mt-1 whitespace-pre-wrap">{certificate.extracted_data.certificate_holder || '—'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* General Liability */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Shield className="w-4 h-4 text-slate-500" />
+                  <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">General Liability</h3>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Insurer Letter</label>
+                    <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.gl_insurer_letter || '—'}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Policy Number</label>
+                    <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.gl_policy_number || '—'}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Effective Date</label>
+                    <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.gl_effective_date || '—'}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Expiration Date</label>
+                    <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.gl_expiration_date || '—'}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Each Occurrence</label>
+                    <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.gl_each_occurrence_limit || '—'}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">General Aggregate</label>
+                    <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.gl_general_aggregate_limit || '—'}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Addl Insured</label>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      {certificate.extracted_data.gl_addl_insured ? (
+                        <CheckCircle className="w-4 h-4 text-emerald-600" />
+                      ) : (
+                        <XCircle className="w-4 h-4 text-red-500" />
+                      )}
+                      <span className="text-sm text-slate-900">{certificate.extracted_data.gl_addl_insured ? 'Checked' : 'Not Checked'}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Subrogation Waiver</label>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      {certificate.extracted_data.gl_subr_wvd ? (
+                        <CheckCircle className="w-4 h-4 text-emerald-600" />
+                      ) : (
+                        <XCircle className="w-4 h-4 text-red-500" />
+                      )}
+                      <span className="text-sm text-slate-900">{certificate.extracted_data.gl_subr_wvd ? 'Checked' : 'Not Checked'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Specialized Coverages — shown only when at least one is present */}
+              {(certificate.extracted_data.liquor_liability_limit ||
+                certificate.extracted_data.workers_comp_limit ||
+                certificate.extracted_data.auto_liability_limit ||
+                certificate.extracted_data.umbrella_liability_limit) && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <DollarSign className="w-4 h-4 text-slate-500" />
+                    <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Specialized Coverages</h3>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {certificate.extracted_data.liquor_liability_limit && (
+                      <div>
+                        <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Liquor Liability</label>
+                        <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.liquor_liability_limit}</p>
+                      </div>
+                    )}
+                    {certificate.extracted_data.workers_comp_limit && (
+                      <div>
+                        <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Workers Comp</label>
+                        <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.workers_comp_limit}</p>
+                        {certificate.extracted_data.workers_comp_statutory != null && (
+                          <p className="text-xs text-slate-500">{certificate.extracted_data.workers_comp_statutory ? 'Statutory' : 'Limits'}</p>
+                        )}
+                      </div>
+                    )}
+                    {certificate.extracted_data.auto_liability_limit && (
+                      <div>
+                        <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Auto Liability</label>
+                        <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.auto_liability_limit}</p>
+                      </div>
+                    )}
+                    {certificate.extracted_data.umbrella_liability_limit && (
+                      <div>
+                        <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Umbrella / Excess</label>
+                        <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.umbrella_liability_limit}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Description of Operations */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <MessageSquare className="w-4 h-4 text-slate-500" />
+                  <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Description of Operations</h3>
+                </div>
+                <div className="bg-slate-50 rounded-lg p-4">
+                  <p className="text-sm text-slate-800 whitespace-pre-wrap">{certificate.extracted_data.description_of_operations || 'Not provided'}</p>
+                </div>
+              </div>
             </div>
-            <div>
-              <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Policy Number</label>
-              <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.policyNumber}</p>
+          ) : (
+            /* Legacy format fallback for older certificates */
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+              <div>
+                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Insurance Company</label>
+                <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.insuranceCompany || '—'}</p>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Policy Number</label>
+                <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.policyNumber || '—'}</p>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Effective Date</label>
+                <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.effectiveDate || '—'}</p>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Expiration Date</label>
+                <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.expirationDate || '—'}</p>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">General Liability</label>
+                <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.generalLiability || '—'}</p>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Aggregate Limit</label>
+                <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.aggregateLimit || '—'}</p>
+              </div>
+              <div className="md:col-span-3">
+                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Certificate Holder</label>
+                <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.certificateHolder || '—'}</p>
+              </div>
+              <div className="md:col-span-3">
+                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Additional Insured</label>
+                <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.additionalInsured || '—'}</p>
+              </div>
+              <div className="md:col-span-3">
+                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Description</label>
+                <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.description || '—'}</p>
+              </div>
             </div>
-            <div>
-              <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Effective Date</label>
-              <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.effectiveDate}</p>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Expiration Date</label>
-              <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.expirationDate}</p>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">General Liability</label>
-              <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.generalLiability}</p>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Aggregate Limit</label>
-              <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.aggregateLimit}</p>
-            </div>
-            <div className="md:col-span-3">
-              <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Certificate Holder</label>
-              <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.certificateHolder}</p>
-            </div>
-            <div className="md:col-span-3">
-              <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Additional Insured</label>
-              <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.additionalInsured}</p>
-            </div>
-            <div className="md:col-span-3">
-              <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Description</label>
-              <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.description}</p>
-            </div>
-          </div>
+          )}
         </div>
 
           {/* Validation Issues */}
