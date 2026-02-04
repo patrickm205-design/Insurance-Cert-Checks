@@ -236,6 +236,7 @@ export default function VendorUploadPage() {
   const vendorTypes = [
     'Caterer',
     'Catering/Bar',
+    'Food Truck',
     'DJ / Entertainment',
     'Photographer',
     'Videographer',

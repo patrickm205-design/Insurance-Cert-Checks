@@ -9,11 +9,16 @@ type VenueSettings = {
   min_gl_limit: number;
   min_aggregate_limit: number;
   max_deductible: number;
+  min_auto_limit: number;
+  min_umbrella_limit: number;
   required_ai_text: string;
   require_subr_wvd: boolean;
+  require_primary_non_contributory: boolean;
+  allow_claims_made: boolean;
   require_liquor: boolean;
   min_liquor_limit: number;
   strict_workers_comp: boolean;
+  enforce_auto_owned: boolean;
   expiration_buffer_days: number;
   validation_mode: 'strict' | 'warning';
 };
@@ -24,11 +29,16 @@ const DEFAULTS: VenueSettings = {
   min_gl_limit: 1000000,
   min_aggregate_limit: 2000000,
   max_deductible: 5000,
+  min_auto_limit: 1000000,
+  min_umbrella_limit: 0,
   required_ai_text: '',
   require_subr_wvd: false,
+  require_primary_non_contributory: true,
+  allow_claims_made: false,
   require_liquor: false,
   min_liquor_limit: 1000000,
   strict_workers_comp: false,
+  enforce_auto_owned: true,
   expiration_buffer_days: 0,
   validation_mode: 'warning',
 };
@@ -81,11 +91,16 @@ export default function VenueSettingsPage() {
             min_gl_limit: Number(data.min_gl_limit) || 1000000,
             min_aggregate_limit: Number(data.min_aggregate_limit) || 2000000,
             max_deductible: Number(data.max_deductible) || 5000,
+            min_auto_limit: Number(data.min_auto_limit) || 1000000,
+            min_umbrella_limit: Number(data.min_umbrella_limit) || 0,
             required_ai_text: data.required_ai_text || '',
             require_subr_wvd: Boolean(data.require_subr_wvd),
+            require_primary_non_contributory: data.require_primary_non_contributory == null ? true : Boolean(data.require_primary_non_contributory),
+            allow_claims_made: Boolean(data.allow_claims_made),
             require_liquor: Boolean(data.require_liquor),
             min_liquor_limit: Number(data.min_liquor_limit) || 1000000,
             strict_workers_comp: Boolean(data.strict_workers_comp),
+            enforce_auto_owned: data.enforce_auto_owned == null ? true : Boolean(data.enforce_auto_owned),
             expiration_buffer_days: Number(data.expiration_buffer_days) || 0,
             validation_mode: data.validation_mode === 'strict' ? 'strict' : 'warning',
           });
@@ -204,7 +219,7 @@ export default function VenueSettingsPage() {
           </div>
         </div>
 
-        {/* 2. Liability Thresholds */}
+        {/* 2. Financial Liability Thresholds */}
         <div className="bg-white border border-slate-200 rounded-xl p-6">
           <h2 className="text-base font-semibold text-slate-900 mb-1">Financial Liability Thresholds</h2>
           <p className="text-xs text-slate-500 mb-4">Minimum coverage amounts required on each certificate.</p>
@@ -222,7 +237,19 @@ export default function VenueSettingsPage() {
             <div>
               <label className="block text-xs font-medium text-slate-600 uppercase tracking-wider mb-1.5">Max Deductible</label>
               <CurrencyInput value={settings.max_deductible} onChange={v => set('max_deductible', v)} />
-              <p className="text-xs text-slate-400 mt-1">Optional flag</p>
+              <p className="text-xs text-slate-400 mt-1">Umbrella retention flag</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4 mt-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 uppercase tracking-wider mb-1.5">Min Auto Liability</label>
+              <CurrencyInput value={settings.min_auto_limit} onChange={v => set('min_auto_limit', v)} />
+              <p className="text-xs text-slate-400 mt-1">Required for Catering / Transportation</p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 uppercase tracking-wider mb-1.5">Min Umbrella Limit</label>
+              <CurrencyInput value={settings.min_umbrella_limit} onChange={v => set('min_umbrella_limit', v)} />
+              <p className="text-xs text-slate-400 mt-1">0 = not enforced</p>
             </div>
           </div>
         </div>
@@ -241,16 +268,38 @@ export default function VenueSettingsPage() {
               className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
             />
           </div>
-          <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-            <div>
-              <p className="text-sm font-medium text-slate-900">Require Waiver of Subrogation</p>
-              <p className="text-xs text-slate-500">AI checks for the SUBR WVD checkbox on General Liability</p>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+              <div>
+                <p className="text-sm font-medium text-slate-900">Require Waiver of Subrogation</p>
+                <p className="text-xs text-slate-500">Checks SUBR WVD checkbox and scans Description for waiver language</p>
+              </div>
+              <Toggle on={settings.require_subr_wvd} onChange={() => set('require_subr_wvd', !settings.require_subr_wvd)} />
             </div>
-            <Toggle on={settings.require_subr_wvd} onChange={() => set('require_subr_wvd', !settings.require_subr_wvd)} />
+            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+              <div>
+                <p className="text-sm font-medium text-slate-900">Require Primary & Non-Contributory</p>
+                <p className="text-xs text-slate-500">Scans Description for "Primary and Non-Contributory" endorsement language</p>
+              </div>
+              <Toggle on={settings.require_primary_non_contributory} onChange={() => set('require_primary_non_contributory', !settings.require_primary_non_contributory)} />
+            </div>
           </div>
         </div>
 
-        {/* 4. Conditional Risk Rules */}
+        {/* 4. Policy Structure Rules */}
+        <div className="bg-white border border-slate-200 rounded-xl p-6">
+          <h2 className="text-base font-semibold text-slate-900 mb-1">Policy Structure Rules</h2>
+          <p className="text-xs text-slate-500 mb-4">Risk flags based on how the policy is structured.</p>
+          <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+            <div>
+              <p className="text-sm font-medium text-slate-900">Allow Claims-Made Policies</p>
+              <p className="text-xs text-slate-500">If OFF, Claims-Made policies are flagged HIGH RISK. Occurrence-based is preferred.</p>
+            </div>
+            <Toggle on={settings.allow_claims_made} onChange={() => set('allow_claims_made', !settings.allow_claims_made)} />
+          </div>
+        </div>
+
+        {/* 5. Conditional Risk Rules */}
         <div className="bg-white border border-slate-200 rounded-xl p-6">
           <h2 className="text-base font-semibold text-slate-900 mb-1">Conditional Risk Rules</h2>
           <p className="text-xs text-slate-500 mb-4">Rules that activate based on vendor type.</p>
@@ -272,15 +321,22 @@ export default function VenueSettingsPage() {
             )}
             <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
               <div>
+                <p className="text-sm font-medium text-slate-900">Enforce Auto Liability for Catering / Transport</p>
+                <p className="text-xs text-slate-500">Caterer, Food Truck, and Transportation vendors must show Owned or Any Auto coverage</p>
+              </div>
+              <Toggle on={settings.enforce_auto_owned} onChange={() => set('enforce_auto_owned', !settings.enforce_auto_owned)} />
+            </div>
+            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+              <div>
                 <p className="text-sm font-medium text-slate-900">Strict Workers Comp Enforcement</p>
-                <p className="text-xs text-slate-500">If OFF, solo vendors (e.g., guitarist) can pass without Workers Comp</p>
+                <p className="text-xs text-slate-500">If ON, all vendors must carry WC unless "Proprietor Excluded" is checked on the cert</p>
               </div>
               <Toggle on={settings.strict_workers_comp} onChange={() => set('strict_workers_comp', !settings.strict_workers_comp)} />
             </div>
           </div>
         </div>
 
-        {/* 5. Date & Buffer */}
+        {/* 6. Date & Buffer */}
         <div className="bg-white border border-slate-200 rounded-xl p-6">
           <h2 className="text-base font-semibold text-slate-900 mb-1">Date & Buffer Logic</h2>
           <p className="text-xs text-slate-500 mb-4">Require policies to remain valid beyond the event date.</p>
@@ -299,7 +355,7 @@ export default function VenueSettingsPage() {
           </div>
         </div>
 
-        {/* 6. Enforcement Mode */}
+        {/* 7. Enforcement Mode */}
         <div className="bg-white border border-slate-200 rounded-xl p-6">
           <h2 className="text-base font-semibold text-slate-900 mb-1">Enforcement Mode</h2>
           <p className="text-xs text-slate-500 mb-4">Controls how validation failures are displayed.</p>

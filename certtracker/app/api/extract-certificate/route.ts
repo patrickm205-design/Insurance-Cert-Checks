@@ -58,22 +58,27 @@ function fuzzyMatch(a: string, b: string): number {
 // Fetch venue settings (with safe fallback)
 // ---------------------------------------------------------------------------
 
-async function fetchVenueSettings(): Promise<any> {
-  const DEFAULTS = {
-    venue_name: '',
-    venue_address: '',
-    min_gl_limit: 1000000,
-    min_aggregate_limit: 2000000,
-    max_deductible: 5000,
-    required_ai_text: '',
-    require_subr_wvd: false,
-    require_liquor: false,
-    min_liquor_limit: 1000000,
-    strict_workers_comp: false,
-    expiration_buffer_days: 0,
-    validation_mode: 'warning',
-  };
+const SETTINGS_DEFAULTS = {
+  venue_name: '',
+  venue_address: '',
+  min_gl_limit: 1000000,
+  min_aggregate_limit: 2000000,
+  max_deductible: 5000,
+  required_ai_text: '',
+  require_subr_wvd: false,
+  require_liquor: false,
+  min_liquor_limit: 1000000,
+  strict_workers_comp: false,
+  enforce_auto_owned: true,
+  min_auto_limit: 1000000,
+  min_umbrella_limit: 0,
+  allow_claims_made: false,
+  require_primary_non_contributory: true,
+  expiration_buffer_days: 0,
+  validation_mode: 'warning',
+};
 
+async function fetchVenueSettings(): Promise<typeof SETTINGS_DEFAULTS> {
   try {
     const { data, error } = await supabase
       .from('venue_settings')
@@ -81,10 +86,23 @@ async function fetchVenueSettings(): Promise<any> {
       .eq('id', 'default')
       .single();
 
-    if (error || !data) return DEFAULTS;
-    return { ...DEFAULTS, ...data };
+    if (error || !data) return SETTINGS_DEFAULTS;
+    return { ...SETTINGS_DEFAULTS, ...data };
   } catch {
-    return DEFAULTS;
+    return SETTINGS_DEFAULTS;
+  }
+}
+
+async function fetchEventName(eventId: string): Promise<string> {
+  try {
+    const { data } = await supabase
+      .from('events')
+      .select('name')
+      .eq('id', eventId)
+      .single();
+    return data?.name || 'Unknown Event';
+  } catch {
+    return 'Unknown Event';
   }
 }
 
@@ -103,7 +121,7 @@ function validateCertificate(
   data: any,
   eventDate: string,
   vendorType: string,
-  settings: any
+  settings: typeof SETTINGS_DEFAULTS
 ): Issue[] {
   const issues: Issue[] = [];
   const isStrict = settings.validation_mode === 'strict';
@@ -115,7 +133,27 @@ function validateCertificate(
   };
 
   // ------------------------------------------------------------------
-  // 1. Identity Check – fuzzy match certificate_holder vs venue_name
+  // Pre-check: Critical null fields → warning (forces Review status)
+  // ------------------------------------------------------------------
+  const criticalNulls: { field: string; label: string }[] = [
+    { field: 'producer_name', label: 'Producer Name' },
+    { field: 'insured_name', label: 'Insured Name' },
+    { field: 'gl_policy_number', label: 'GL Policy Number' },
+    { field: 'gl_effective_date', label: 'GL Effective Date' },
+  ];
+  for (const { field, label } of criticalNulls) {
+    if (!data[field]) {
+      issues.push({
+        severity: 'warning',
+        field: label,
+        issue: `${label} not extracted`,
+        detail: `${label} is a required field on an ACORD 25 form. Manual review is needed.`,
+      });
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Step 1: Identity Check + Active Window
   // ------------------------------------------------------------------
   if (settings.venue_name && settings.venue_name.trim()) {
     if (data.certificate_holder) {
@@ -130,8 +168,20 @@ function validateCertificate(
     }
   }
 
+  // Active window: policy effective date must be on or before event date
+  if (data.gl_effective_date && eventDate) {
+    const effDate = new Date(data.gl_effective_date);
+    const evDate = new Date(eventDate);
+    effDate.setHours(0, 0, 0, 0);
+    evDate.setHours(0, 0, 0, 0);
+    if (effDate > evDate) {
+      add('error', 'Effective Date', 'Policy is not yet active on event date',
+        `Policy effective date is ${data.gl_effective_date} but the event is on ${eventDate}. Coverage must be active by the event.`);
+    }
+  }
+
   // ------------------------------------------------------------------
-  // 2. Date Check with expiration buffer
+  // Step 2: Date / Expiration Check with buffer
   // ------------------------------------------------------------------
   if (data.gl_expiration_date) {
     const expDate = new Date(data.gl_expiration_date);
@@ -158,7 +208,7 @@ function validateCertificate(
   }
 
   // ------------------------------------------------------------------
-  // 3. Liability Thresholds + Umbrella Stack
+  // Step 3: Liability Thresholds + Umbrella Stack + Endorsement Scans
   // ------------------------------------------------------------------
   const minGl = Number(settings.min_gl_limit) || 1000000;
   const glLimit = parseCurrency(data.gl_each_occurrence_limit);
@@ -171,7 +221,7 @@ function validateCertificate(
         issues.push({
           severity: 'info',
           field: 'General Liability',
-          issue: 'Coverage met via Umbrella',
+          issue: 'Coverage met via Umbrella stacking',
           detail: `GL Each Occurrence: ${formatCurrency(glLimit)} + Umbrella: ${formatCurrency(umbrellaLimit)} = ${formatCurrency(glLimit + umbrellaLimit)} (minimum: ${formatCurrency(minGl)}).`,
         });
       } else {
@@ -197,12 +247,39 @@ function validateCertificate(
       'General Aggregate coverage amount must be clearly stated.');
   }
 
-  // ------------------------------------------------------------------
-  // 4. Endorsement Checks
-  // ------------------------------------------------------------------
-  // a) Required AI text in description of operations
+  // Description-of-operations keyword auto-scans
+  const desc = (data.description_of_operations || '').toLowerCase();
+
+  // Venue name presence in description
+  if (settings.venue_name && settings.venue_name.trim()) {
+    const venueNameLower = settings.venue_name.toLowerCase();
+    if (!desc.includes(venueNameLower)) {
+      issues.push({
+        severity: 'info',
+        field: 'Description of Operations',
+        issue: 'Venue name not mentioned in Description of Operations',
+        detail: `"${settings.venue_name}" does not appear in the Description of Operations. This may be acceptable but should be verified.`,
+      });
+    }
+  }
+
+  // Primary & Non-Contributory endorsement scan
+  if (settings.require_primary_non_contributory) {
+    const pncPhrases = [
+      'primary and non-contributory',
+      'primary & non-contributory',
+      'primary and noncontributory',
+      'primary & noncontributory',
+    ];
+    const hasPnc = pncPhrases.some(phrase => desc.includes(phrase));
+    if (!hasPnc) {
+      add('error', 'Primary & Non-Contributory', 'P&NC endorsement language not found',
+        'Required "Primary and Non-Contributory" language was not found in the Description of Operations.');
+    }
+  }
+
+  // Required additional-insured text
   if (settings.required_ai_text && settings.required_ai_text.trim()) {
-    const desc = (data.description_of_operations || '').toLowerCase();
     const required = settings.required_ai_text.toLowerCase().trim();
     if (!desc.includes(required)) {
       add('error', 'Description of Operations', 'Missing required Additional Insured language',
@@ -210,34 +287,23 @@ function validateCertificate(
     }
   }
 
-  // b) Waiver of Subrogation
+  // Waiver of Subrogation checkbox
   if (settings.require_subr_wvd && data.gl_subr_wvd !== true) {
     add('error', 'Waiver of Subrogation', 'SUBR WVD not checked',
       'The Waiver of Subrogation (SUBR WVD) checkbox must be checked on the General Liability line.');
   }
 
-  // ------------------------------------------------------------------
-  // 5. Conditional "Smart" Checks
-  // ------------------------------------------------------------------
-  // Liquor Liability – triggered when vendor is an alcohol service type
-  const alcoholTypes = ['catering/bar', 'alcohol service'];
-  const isAlcoholVendor = vendorType && alcoholTypes.some(t => vendorType.toLowerCase() === t);
-
-  if (settings.require_liquor && isAlcoholVendor) {
-    const minLiquor = Number(settings.min_liquor_limit) || 1000000;
-    const liquorLimit = parseCurrency(data.liquor_liability_limit);
-    if (liquorLimit === null || liquorLimit < minLiquor) {
-      add('error', 'Liquor Liability', 'Vendor is serving alcohol but missing Liquor Liability coverage',
-        liquorLimit !== null
-          ? `Found: ${formatCurrency(liquorLimit)}. Minimum required: ${formatCurrency(minLiquor)}.`
-          : `No Liquor Liability coverage found. Minimum required: ${formatCurrency(minLiquor)}.`);
+  // Waiver of Subrogation text scan (complementary — checkbox checked but no language)
+  if (settings.require_subr_wvd && data.gl_subr_wvd === true) {
+    const subrPhrases = ['waiver of subrogation', 'subrogation waiver'];
+    if (!subrPhrases.some(phrase => desc.includes(phrase))) {
+      issues.push({
+        severity: 'info',
+        field: 'Waiver of Subrogation',
+        issue: 'SUBR WVD checked but waiver language not in Description',
+        detail: 'The SUBR WVD checkbox is checked but explicit waiver language was not found in Description of Operations. Verify endorsement is attached.',
+      });
     }
-  }
-
-  // Workers Comp – strict mode requires coverage for all vendors
-  if (settings.strict_workers_comp && !data.workers_comp_limit) {
-    add('error', 'Workers Compensation', 'Workers Compensation coverage required',
-      'Strict Workers Comp enforcement is enabled. Workers Compensation coverage must be present.');
   }
 
   // Additional Insured checkbox warning
@@ -248,6 +314,99 @@ function validateCertificate(
       issue: 'Additional Insured checkbox not checked',
       detail: 'The ADDL INSD checkbox is not checked for General Liability. Verify this is acceptable.',
     });
+  }
+
+  // ------------------------------------------------------------------
+  // Step 4: Policy Structure Risk
+  // ------------------------------------------------------------------
+  // Claims-Made policy check
+  if (data.gl_occurrence_type === 'CLAIMS-MADE') {
+    if (!settings.allow_claims_made) {
+      add('error', 'Policy Type', 'Claims-Made policy detected — HIGH RISK',
+        'This policy is written on a Claims-Made basis. Your venue requires Occurrence-based policies. A Claims-Made policy only covers claims filed during the policy period, not claims for incidents that occur during the policy period.');
+    } else {
+      issues.push({
+        severity: 'info',
+        field: 'Policy Type',
+        issue: 'Claims-Made policy — allowed',
+        detail: 'This policy is written on a Claims-Made basis. Claims-Made policies are permitted per your venue settings.',
+      });
+    }
+  }
+
+  // Umbrella deductible vs max deductible
+  const umbrellaDeductible = parseCurrency(data.umbrella_deductible);
+  if (umbrellaDeductible !== null && umbrellaDeductible > Number(settings.max_deductible)) {
+    issues.push({
+      severity: 'warning',
+      field: 'Umbrella Deductible',
+      issue: 'Umbrella deductible exceeds venue maximum',
+      detail: `Umbrella deductible: ${formatCurrency(umbrellaDeductible)}. Maximum allowed: ${formatCurrency(Number(settings.max_deductible))}. Verify this is acceptable.`,
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // Step 5: Conditional Smart Checks
+  // ------------------------------------------------------------------
+  const vendorTypeLower = (vendorType || '').toLowerCase();
+  const isAlcoholVendor = ['catering/bar', 'alcohol service'].includes(vendorTypeLower);
+  const isAutoRelevant = ['caterer', 'catering/bar', 'food truck', 'transportation', 'shuttle'].includes(vendorTypeLower);
+
+  // Liquor Liability
+  if (settings.require_liquor && isAlcoholVendor) {
+    const minLiquor = Number(settings.min_liquor_limit) || 1000000;
+    const liquorLimit = parseCurrency(data.liquor_liability_limit);
+    if (liquorLimit === null || liquorLimit < minLiquor) {
+      add('error', 'Liquor Liability', 'Vendor is serving alcohol but missing or insufficient Liquor Liability coverage',
+        liquorLimit !== null
+          ? `Found: ${formatCurrency(liquorLimit)}. Minimum required: ${formatCurrency(minLiquor)}.`
+          : `No Liquor Liability coverage found. Minimum required: ${formatCurrency(minLiquor)}.`);
+    }
+  }
+
+  // Auto Liability
+  if (isAutoRelevant) {
+    const minAuto = Number(settings.min_auto_limit) || 1000000;
+    const autoLimit = parseCurrency(data.auto_liability_limit);
+    if (autoLimit === null || autoLimit < minAuto) {
+      add('error', 'Auto Liability', `${vendorType} vendor requires Auto Liability coverage`,
+        autoLimit !== null
+          ? `Found: ${formatCurrency(autoLimit)}. Minimum required: ${formatCurrency(minAuto)}.`
+          : `No Auto Liability coverage found. Minimum required: ${formatCurrency(minAuto)}.`);
+    }
+    // Owned vehicle enforcement
+    if (settings.enforce_auto_owned && data.auto_coverage_type) {
+      if (!data.auto_coverage_type.owned) {
+        add('error', 'Auto Liability', 'Owned vehicles not covered',
+          'Your venue requires "Owned" auto coverage. The Auto Liability section does not show coverage for owned vehicles.');
+      }
+    }
+  }
+
+  // Umbrella minimum threshold
+  const minUmbrella = Number(settings.min_umbrella_limit) || 0;
+  if (minUmbrella > 0) {
+    if (umbrellaLimit === null || umbrellaLimit < minUmbrella) {
+      add('error', 'Umbrella / Excess', 'Umbrella coverage below minimum',
+        umbrellaLimit !== null
+          ? `Found: ${formatCurrency(umbrellaLimit)}. Minimum required: ${formatCurrency(minUmbrella)}.`
+          : `No Umbrella/Excess coverage found. Minimum required: ${formatCurrency(minUmbrella)}.`);
+    }
+  }
+
+  // Workers Compensation with sole-proprietor bypass
+  if (settings.strict_workers_comp) {
+    if (data.wc_proprietor_excluded === true) {
+      issues.push({
+        severity: 'info',
+        field: 'Workers Compensation',
+        issue: 'Sole Proprietor Exemption noted',
+        detail: 'Workers Compensation requirement is waived — Sole Proprietor exclusion is noted on the certificate.',
+      });
+    } else if (!data.workers_comp_limit) {
+      add('error', 'Workers Compensation', 'Workers Compensation coverage required',
+        'Strict Workers Comp enforcement is enabled. Workers Compensation coverage must be present.');
+    }
   }
 
   // ------------------------------------------------------------------
@@ -263,6 +422,42 @@ function validateCertificate(
   }
 
   return issues;
+}
+
+// ---------------------------------------------------------------------------
+// Email Payload Generator
+// ---------------------------------------------------------------------------
+
+function generateEmailPayload(
+  vendorName: string,
+  eventName: string,
+  issues: Issue[],
+  status: string
+): { subject: string; body: string } | null {
+  if (status === 'green') return null;
+
+  const actionable = issues.filter(i => i.severity === 'error' || i.severity === 'warning');
+  if (actionable.length === 0) return null;
+
+  const statusLabel = status === 'red' ? 'Rejected' : 'Requires Review';
+  const subject = `Certificate ${statusLabel} — ${vendorName} for ${eventName}`;
+
+  const issueLines = actionable.map(i =>
+    `• [${i.severity.toUpperCase()}] ${i.field}: ${i.issue}\n  ${i.detail}`
+  ).join('\n\n');
+
+  const body =
+`Dear ${vendorName},
+
+Your certificate of insurance for "${eventName}" has been flagged for the following reasons:
+
+${issueLines}
+
+Please review the items above and resubmit a corrected certificate at your earliest convenience.
+
+Thank you.`;
+
+  return { subject, body };
 }
 
 // ---------------------------------------------------------------------------
@@ -284,8 +479,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'PDF data is required' }, { status: 400 });
     }
 
-    // Fetch venue settings from DB (server-side, authoritative)
-    const settings = await fetchVenueSettings();
+    // Fetch venue settings and event name in parallel
+    const [settings, eventName] = await Promise.all([
+      fetchVenueSettings(),
+      eventId ? fetchEventName(eventId) : Promise.resolve('Unknown Event'),
+    ]);
 
     // ------------------------------------------------------------------
     // Extract from PDF using Claude
@@ -326,19 +524,31 @@ Return ONLY a valid JSON object with exactly these keys — no extra text or exp
   "gl_general_aggregate_limit": "The GEN'L AGGREGATE amount (e.g. $2,000,000)",
   "gl_addl_insured": "true or false — is the ADDL INSD checkbox checked for General Liability?",
   "gl_subr_wvd": "true or false — is the SUBR WVD checkbox checked for General Liability?",
+  "gl_occurrence_type": "OCCUR if the Occurrence checkbox is checked on the General Liability row, or CLAIMS-MADE if the Claims-Made checkbox is checked. null if neither is clearly marked.",
 
   "liquor_liability_limit": "Liquor Liability coverage limit if a row exists (e.g. $1,000,000), otherwise null",
+
   "workers_comp_statutory": "true or false — does the Workers Comp section show STATUTORY limits? null if no Workers Comp section",
   "workers_comp_limit": "E.L. EACH ACCIDENT amount from Workers Comp (e.g. $1,000,000), otherwise null",
+  "wc_proprietor_excluded": "true or false — is there a notation that the sole proprietor / owner is EXCLUDED from Workers Comp coverage? null if no Workers Comp section",
+
   "auto_liability_limit": "Auto Liability COMBINED SINGLE LIMIT (e.g. $1,000,000), otherwise null",
+  "auto_addl_insured": "true or false — is the ADDL INSD checkbox checked for the Auto Liability row? null if no Auto row",
+  "auto_subr_wvd": "true or false — is the SUBR WVD checkbox checked for the Auto Liability row? null if no Auto row",
+  "auto_coverage_type": "An object describing which auto coverage checkboxes are checked: { any_auto: boolean, owned: boolean, hired: boolean, non_owned: boolean }. null if no Auto Liability row exists.",
+
   "umbrella_liability_limit": "Umbrella / Excess Liability EACH OCCURRENCE amount (e.g. $5,000,000), otherwise null",
+  "umbrella_type": "UMBRELLA if the form indicates Umbrella Liability, EXCESS if it indicates Excess Liability. null if not present.",
+  "umbrella_deductible": "The deductible amount shown for Umbrella/Excess coverage (e.g. $10,000). null if no deductible or no Umbrella row.",
 
   "description_of_operations": "The COMPLETE text from the Description of Operations / Locations / Exclusions box. Capture every word exactly as written."
 }
 
 Important notes:
-- gl_addl_insured and gl_subr_wvd must be JSON booleans (true / false), not strings.
-- workers_comp_statutory must be a boolean or null.
+- gl_addl_insured, gl_subr_wvd, workers_comp_statutory, wc_proprietor_excluded, auto_addl_insured, and auto_subr_wvd must be JSON booleans (true / false) or null — never strings.
+- auto_coverage_type must be a JSON object with boolean values { any_auto, owned, hired, non_owned }, or null if no Auto row.
+- gl_occurrence_type must be the string "OCCUR" or "CLAIMS-MADE", or null.
+- umbrella_type must be the string "UMBRELLA" or "EXCESS", or null.
 - Currency fields should be returned as strings exactly as they appear on the form (e.g. "$1,000,000").
 - If description_of_operations is empty or says "N/A", return null.`,
             },
@@ -367,14 +577,23 @@ Important notes:
     }
 
     // Coerce boolean fields that Claude may return as strings
-    if (typeof extractedData.gl_addl_insured === 'string') {
-      extractedData.gl_addl_insured = extractedData.gl_addl_insured.toLowerCase() === 'true';
+    const boolFields = [
+      'gl_addl_insured', 'gl_subr_wvd', 'workers_comp_statutory',
+      'wc_proprietor_excluded', 'auto_addl_insured', 'auto_subr_wvd',
+    ];
+    for (const field of boolFields) {
+      if (typeof extractedData[field] === 'string') {
+        extractedData[field] = extractedData[field].toLowerCase() === 'true';
+      }
     }
-    if (typeof extractedData.gl_subr_wvd === 'string') {
-      extractedData.gl_subr_wvd = extractedData.gl_subr_wvd.toLowerCase() === 'true';
-    }
-    if (typeof extractedData.workers_comp_statutory === 'string') {
-      extractedData.workers_comp_statutory = extractedData.workers_comp_statutory.toLowerCase() === 'true';
+
+    // Coerce auto_coverage_type sub-booleans
+    if (extractedData.auto_coverage_type && typeof extractedData.auto_coverage_type === 'object') {
+      for (const key of ['any_auto', 'owned', 'hired', 'non_owned']) {
+        if (typeof extractedData.auto_coverage_type[key] === 'string') {
+          extractedData.auto_coverage_type[key] = extractedData.auto_coverage_type[key].toLowerCase() === 'true';
+        }
+      }
     }
 
     // ------------------------------------------------------------------
@@ -404,6 +623,17 @@ Important notes:
     let status: 'green' | 'yellow' | 'red' = 'green';
     if (validationIssues.some(i => i.severity === 'error')) status = 'red';
     else if (validationIssues.some(i => i.severity === 'warning')) status = 'yellow';
+
+    // Human-readable status label
+    const statusLabel = status === 'green' ? 'APPROVED' : status === 'yellow' ? 'REVIEW_NEEDED' : 'REJECTED';
+
+    // Email payload for remediation notification
+    const emailPayload = generateEmailPayload(
+      vendorName || 'Vendor',
+      eventName,
+      validationIssues,
+      status
+    );
 
     // ------------------------------------------------------------------
     // Persist
@@ -502,8 +732,10 @@ Important notes:
       validationIssues,
       confidence,
       status,
+      statusLabel,
       pdfUrl,
       pdfUploadError,
+      emailPayload,
     });
   } catch (error) {
     console.error('Certificate extraction error:', error);

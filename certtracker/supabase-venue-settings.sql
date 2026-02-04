@@ -28,3 +28,12 @@ ALTER TABLE venue_settings ENABLE ROW LEVEL SECURITY;
 CREATE POLICY IF NOT EXISTS "Allow all access to venue_settings"
 ON venue_settings
 FOR ALL USING (true) WITH CHECK (true);
+
+-- ---------------------------------------------------------------------------
+-- v2 columns — safe to run against an existing table (IF NOT EXISTS)
+-- ---------------------------------------------------------------------------
+ALTER TABLE venue_settings ADD COLUMN IF NOT EXISTS min_auto_limit            NUMERIC  DEFAULT 1000000;
+ALTER TABLE venue_settings ADD COLUMN IF NOT EXISTS min_umbrella_limit        NUMERIC  DEFAULT 0;
+ALTER TABLE venue_settings ADD COLUMN IF NOT EXISTS allow_claims_made         BOOLEAN  DEFAULT false;
+ALTER TABLE venue_settings ADD COLUMN IF NOT EXISTS require_primary_non_contributory BOOLEAN DEFAULT true;
+ALTER TABLE venue_settings ADD COLUMN IF NOT EXISTS enforce_auto_owned        BOOLEAN  DEFAULT true;

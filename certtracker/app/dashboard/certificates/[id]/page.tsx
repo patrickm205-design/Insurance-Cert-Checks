@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, FileText, Calendar, Building2, DollarSign, Shield, MessageSquare } from 'lucide-react';
+import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, FileText, Calendar, Building2, DollarSign, Shield, MessageSquare, Mail } from 'lucide-react';
 import Link from 'next/link';
 import TrafficLightBadge from '@/components/certificates/TrafficLightBadge';
 import { useAuth } from '@/lib/auth-context';
@@ -274,6 +274,30 @@ export default function CertificateReviewPage() {
                     <p className="text-sm text-slate-900 mt-1 whitespace-pre-wrap">{certificate.extracted_data.certificate_holder || '—'}</p>
                   </div>
                 </div>
+
+                {/* Identity Audit — side-by-side comparison */}
+                <div className="mt-4 pt-4 border-t border-slate-200">
+                  <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Identity Audit</label>
+                  <div className="flex items-center gap-3 mt-2">
+                    <div className="flex-1 bg-slate-50 border border-slate-200 rounded-lg p-3">
+                      <p className="text-xs text-slate-500 mb-0.5">Vendor (DB Record)</p>
+                      <p className="text-sm font-medium text-slate-900">{certificate.vendor.name}</p>
+                    </div>
+                    <div className="flex-shrink-0">
+                      {(certificate.extracted_data.insured_name &&
+                        (certificate.vendor.name.toLowerCase().includes(certificate.extracted_data.insured_name.toLowerCase()) ||
+                         certificate.extracted_data.insured_name.toLowerCase().includes(certificate.vendor.name.toLowerCase()))) ? (
+                        <CheckCircle className="w-6 h-6 text-emerald-600" />
+                      ) : (
+                        <XCircle className="w-6 h-6 text-amber-500" />
+                      )}
+                    </div>
+                    <div className="flex-1 bg-slate-50 border border-slate-200 rounded-lg p-3">
+                      <p className="text-xs text-slate-500 mb-0.5">Insured (Extracted)</p>
+                      <p className="text-sm font-medium text-slate-900">{certificate.extracted_data.insured_name || '—'}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* General Liability */}
@@ -329,50 +353,111 @@ export default function CertificateReviewPage() {
                       <span className="text-sm text-slate-900">{certificate.extracted_data.gl_subr_wvd ? 'Checked' : 'Not Checked'}</span>
                     </div>
                   </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Policy Type</label>
+                    <div className="mt-1">
+                      {certificate.extracted_data.gl_occurrence_type === 'OCCUR' ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">Occurrence</span>
+                      ) : certificate.extracted_data.gl_occurrence_type === 'CLAIMS-MADE' ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Claims-Made</span>
+                      ) : (
+                        <span className="text-sm text-slate-500">—</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Specialized Coverages — shown only when at least one is present */}
-              {(certificate.extracted_data.liquor_liability_limit ||
-                certificate.extracted_data.workers_comp_limit ||
-                certificate.extracted_data.auto_liability_limit ||
-                certificate.extracted_data.umbrella_liability_limit) && (
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <DollarSign className="w-4 h-4 text-slate-500" />
-                    <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Specialized Coverages</h3>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {certificate.extracted_data.liquor_liability_limit && (
-                      <div>
-                        <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Liquor Liability</label>
-                        <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.liquor_liability_limit}</p>
+              {/* Specialized Coverages — always visible */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <DollarSign className="w-4 h-4 text-slate-500" />
+                  <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Specialized Coverages</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Automobile Liability */}
+                  <div className="border border-slate-200 rounded-lg p-4">
+                    <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Automobile Liability</label>
+                    {certificate.extracted_data.auto_liability_limit ? (
+                      <div className="mt-2 space-y-2">
+                        <p className="text-sm font-semibold text-slate-900">{certificate.extracted_data.auto_liability_limit}</p>
+                        {certificate.extracted_data.auto_coverage_type && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {certificate.extracted_data.auto_coverage_type.any_auto && <span className="px-2 py-0.5 rounded text-xs bg-indigo-100 text-indigo-700">Any Auto</span>}
+                            {certificate.extracted_data.auto_coverage_type.owned && <span className="px-2 py-0.5 rounded text-xs bg-indigo-100 text-indigo-700">Owned</span>}
+                            {certificate.extracted_data.auto_coverage_type.hired && <span className="px-2 py-0.5 rounded text-xs bg-indigo-100 text-indigo-700">Hired</span>}
+                            {certificate.extracted_data.auto_coverage_type.non_owned && <span className="px-2 py-0.5 rounded text-xs bg-indigo-100 text-indigo-700">Non-Owned</span>}
+                          </div>
+                        )}
+                        <div className="flex gap-4">
+                          <div className="flex items-center gap-1.5">
+                            {certificate.extracted_data.auto_addl_insured ? <CheckCircle className="w-3.5 h-3.5 text-emerald-600" /> : <XCircle className="w-3.5 h-3.5 text-red-500" />}
+                            <span className="text-xs text-slate-600">Addl Insured</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            {certificate.extracted_data.auto_subr_wvd ? <CheckCircle className="w-3.5 h-3.5 text-emerald-600" /> : <XCircle className="w-3.5 h-3.5 text-red-500" />}
+                            <span className="text-xs text-slate-600">SUBR WVD</span>
+                          </div>
+                        </div>
                       </div>
+                    ) : (
+                      <p className="text-sm text-slate-400 italic mt-2">Not Present</p>
                     )}
-                    {certificate.extracted_data.workers_comp_limit && (
-                      <div>
-                        <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Workers Comp</label>
-                        <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.workers_comp_limit}</p>
-                        {certificate.extracted_data.workers_comp_statutory != null && (
-                          <p className="text-xs text-slate-500">{certificate.extracted_data.workers_comp_statutory ? 'Statutory' : 'Limits'}</p>
+                  </div>
+
+                  {/* Umbrella / Excess */}
+                  <div className="border border-slate-200 rounded-lg p-4">
+                    <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Umbrella / Excess</label>
+                    {certificate.extracted_data.umbrella_liability_limit ? (
+                      <div className="mt-2 space-y-1.5">
+                        <p className="text-sm font-semibold text-slate-900">{certificate.extracted_data.umbrella_liability_limit}</p>
+                        {certificate.extracted_data.umbrella_type && (
+                          <span className="px-2 py-0.5 rounded text-xs bg-violet-100 text-violet-700">
+                            {certificate.extracted_data.umbrella_type === 'UMBRELLA' ? 'Umbrella' : 'Excess'}
+                          </span>
+                        )}
+                        {certificate.extracted_data.umbrella_deductible && (
+                          <p className="text-xs text-slate-500">Deductible: {certificate.extracted_data.umbrella_deductible}</p>
                         )}
                       </div>
+                    ) : (
+                      <p className="text-sm text-slate-400 italic mt-2">Not Present</p>
                     )}
-                    {certificate.extracted_data.auto_liability_limit && (
-                      <div>
-                        <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Auto Liability</label>
-                        <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.auto_liability_limit}</p>
+                  </div>
+
+                  {/* Workers Compensation */}
+                  <div className="border border-slate-200 rounded-lg p-4">
+                    <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Workers Compensation</label>
+                    {certificate.extracted_data.workers_comp_limit ? (
+                      <div className="mt-2 space-y-1.5">
+                        <p className="text-sm font-semibold text-slate-900">{certificate.extracted_data.workers_comp_limit}</p>
+                        {certificate.extracted_data.workers_comp_statutory != null && (
+                          <span className="px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-700">
+                            {certificate.extracted_data.workers_comp_statutory ? 'Statutory' : 'State Limits'}
+                          </span>
+                        )}
+                        {certificate.extracted_data.wc_proprietor_excluded === true && (
+                          <p className="text-xs text-amber-600 font-medium">Sole Proprietor Excluded</p>
+                        )}
                       </div>
+                    ) : (
+                      <p className="text-sm text-slate-400 italic mt-2">Not Present</p>
                     )}
-                    {certificate.extracted_data.umbrella_liability_limit && (
-                      <div>
-                        <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Umbrella / Excess</label>
-                        <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.umbrella_liability_limit}</p>
+                  </div>
+
+                  {/* Liquor Liability */}
+                  <div className="border border-slate-200 rounded-lg p-4">
+                    <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Liquor Liability</label>
+                    {certificate.extracted_data.liquor_liability_limit ? (
+                      <div className="mt-2">
+                        <p className="text-sm font-semibold text-slate-900">{certificate.extracted_data.liquor_liability_limit}</p>
                       </div>
+                    ) : (
+                      <p className="text-sm text-slate-400 italic mt-2">Not Present</p>
                     )}
                   </div>
                 </div>
-              )}
+              </div>
 
               {/* Description of Operations */}
               <div>
@@ -461,6 +546,45 @@ export default function CertificateReviewPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Remediation Email Preview */}
+          {certificate.validation_issues.some(i => i.severity === 'error' || i.severity === 'warning') && (
+            <div className="bg-white border border-slate-200 rounded-xl p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Mail className="w-5 h-5 text-slate-600" />
+                <h2 className="text-lg font-semibold text-slate-900">Remediation Email Preview</h2>
+              </div>
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-3">
+                <div>
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">To</p>
+                  <p className="text-sm text-slate-900">{certificate.vendor.email}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Subject</p>
+                  <p className="text-sm text-slate-900">
+                    Certificate {certificate.status === 'red' ? 'Rejected' : 'Requires Review'} &mdash; {certificate.vendor.name} for {certificate.event.name}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Body</p>
+                  <div className="text-sm text-slate-800 space-y-2">
+                    <p>Dear {certificate.vendor.name},</p>
+                    <p>Your certificate of insurance for &quot;{certificate.event.name}&quot; has been flagged:</p>
+                    {certificate.validation_issues
+                      .filter(i => i.severity === 'error' || i.severity === 'warning')
+                      .map((issue, idx) => (
+                        <div key={idx} className="border-l-2 border-slate-300 pl-3 py-1">
+                          <p className="font-medium">[{issue.severity.toUpperCase()}] {issue.field}: {issue.issue}</p>
+                          <p className="text-slate-600 text-xs">{issue.detail}</p>
+                        </div>
+                      ))
+                    }
+                    <p>Please review and resubmit a corrected certificate at your earliest convenience.</p>
+                  </div>
+                </div>
               </div>
             </div>
           )}
