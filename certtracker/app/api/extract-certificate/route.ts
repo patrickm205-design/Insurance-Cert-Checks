@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { supabase } from '@/lib/supabase';
-import { supabaseServer } from '@/lib/supabase-server';
+import { getSupabaseServer } from '@/lib/supabase-server';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -159,7 +159,7 @@ Return ONLY the JSON object, no additional text or explanation.`,
           const fileName = `${vendorId}-${eventId}-${Date.now()}.pdf`;
           const pdfBuffer = Buffer.from(pdfBase64, 'base64');
 
-          const { data: uploadData, error: uploadError } = await supabaseServer.storage
+          const { data: uploadData, error: uploadError } = await getSupabaseServer().storage
             .from('certificates')
             .upload(fileName, pdfBuffer, {
               contentType: 'application/pdf',
@@ -171,7 +171,7 @@ Return ONLY the JSON object, no additional text or explanation.`,
             console.error('Upload error details:', JSON.stringify(uploadError, null, 2));
           } else {
             // Get public URL
-            const { data: urlData } = supabaseServer.storage
+            const { data: urlData } = getSupabaseServer().storage
               .from('certificates')
               .getPublicUrl(fileName);
             pdfUrl = urlData.publicUrl;
