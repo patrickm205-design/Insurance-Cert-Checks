@@ -225,84 +225,70 @@ export default function CertificateReviewPage() {
         </div>
       )}
 
-      {/* Two Column Layout */}
-      <div className="grid grid-cols-2 gap-6">
-        {/* Left Column - PDF Viewer */}
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div className="bg-slate-50 border-b border-slate-200 px-6 py-4">
-            <div className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-slate-600" />
-              <h2 className="text-sm font-semibold text-slate-900">Certificate Document</h2>
+      {/* Full-width PDF Viewer */}
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden mb-6">
+        {certificate.pdf_url ? (
+          <iframe
+            src={certificate.pdf_url}
+            className="w-full"
+            style={{ height: 'calc(100vh - 200px)' }}
+            title="Certificate PDF"
+          />
+        ) : (
+          <div className="bg-slate-100 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center" style={{ height: '400px' }}>
+            <div className="text-center">
+              <FileText className="w-16 h-16 text-slate-400 mx-auto mb-4" />
+              <p className="text-sm font-medium text-slate-700 mb-2">PDF Not Available</p>
+              <p className="text-xs text-slate-500">Certificate document was not stored</p>
             </div>
           </div>
-          <div className="p-6">
-            {certificate.pdf_url ? (
-              <iframe
-                src={certificate.pdf_url}
-                className="w-full rounded-lg border border-slate-300"
-                style={{ height: '600px' }}
-                title="Certificate PDF"
-              />
-            ) : (
-              <div className="bg-slate-100 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center" style={{ height: '600px' }}>
-                <div className="text-center">
-                  <FileText className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-                  <p className="text-sm font-medium text-slate-700 mb-2">PDF Not Available</p>
-                  <p className="text-xs text-slate-500">Certificate document was not stored</p>
-                </div>
-              </div>
-            )}
+        )}
+      </div>
+
+      {/* Details below PDF */}
+      <div className="space-y-6">
+        {/* Extracted Data - grid layout */}
+        <div className="bg-white border border-slate-200 rounded-xl p-6">
+          <h2 className="text-lg font-semibold text-slate-900 mb-4">Extracted Certificate Data</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+            <div>
+              <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Insurance Company</label>
+              <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.insuranceCompany}</p>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Policy Number</label>
+              <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.policyNumber}</p>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Effective Date</label>
+              <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.effectiveDate}</p>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Expiration Date</label>
+              <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.expirationDate}</p>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">General Liability</label>
+              <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.generalLiability}</p>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Aggregate Limit</label>
+              <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.aggregateLimit}</p>
+            </div>
+            <div className="md:col-span-3">
+              <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Certificate Holder</label>
+              <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.certificateHolder}</p>
+            </div>
+            <div className="md:col-span-3">
+              <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Additional Insured</label>
+              <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.additionalInsured}</p>
+            </div>
+            <div className="md:col-span-3">
+              <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Description</label>
+              <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.description}</p>
+            </div>
           </div>
         </div>
-
-        {/* Right Column - Certificate Data & Issues */}
-        <div className="space-y-6">
-          {/* Extracted Data */}
-          <div className="bg-white border border-slate-200 rounded-xl p-6">
-            <h2 className="text-lg font-semibold text-slate-900 mb-4">Extracted Certificate Data</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Insurance Company</label>
-                <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.insuranceCompany}</p>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Policy Number</label>
-                <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.policyNumber}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Effective Date</label>
-                  <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.effectiveDate}</p>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Expiration Date</label>
-                  <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.expirationDate}</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">General Liability</label>
-                  <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.generalLiability}</p>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Aggregate Limit</label>
-                  <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.aggregateLimit}</p>
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Certificate Holder</label>
-                <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.certificateHolder}</p>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Additional Insured</label>
-                <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.additionalInsured}</p>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Description</label>
-                <p className="text-sm text-slate-900 mt-1">{certificate.extracted_data.description}</p>
-              </div>
-            </div>
-          </div>
 
           {/* Validation Issues */}
           {certificate.validation_issues.length > 0 && (
@@ -373,7 +359,6 @@ export default function CertificateReviewPage() {
             </button>
           </div>
         </div>
-      </div>
 
       {/* Approve Modal */}
       {showApproveModal && (
