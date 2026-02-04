@@ -124,6 +124,8 @@ Return ONLY the JSON object, no additional text or explanation.`,
 
     // Save to database
     let certificateId: string | null = null;
+    let pdfUrl: string | null = null;
+    let pdfUploadError: string | null = null;
 
     if (vendorName && vendorEmail && eventId) {
       try {
@@ -154,7 +156,6 @@ Return ONLY the JSON object, no additional text or explanation.`,
         }
 
         // Upload PDF to Supabase Storage using service role key
-        let pdfUrl: string | null = null;
         try {
           const fileName = `${vendorId}-${eventId}-${Date.now()}.pdf`;
           const pdfBuffer = Buffer.from(pdfBase64, 'base64');
@@ -167,8 +168,8 @@ Return ONLY the JSON object, no additional text or explanation.`,
             });
 
           if (uploadError) {
+            pdfUploadError = JSON.stringify(uploadError);
             console.error('PDF upload error:', uploadError);
-            console.error('Upload error details:', JSON.stringify(uploadError, null, 2));
           } else {
             // Get public URL
             const { data: urlData } = getSupabaseServer().storage
@@ -178,6 +179,7 @@ Return ONLY the JSON object, no additional text or explanation.`,
             console.log('PDF uploaded successfully:', pdfUrl);
           }
         } catch (uploadErr) {
+          pdfUploadError = uploadErr instanceof Error ? uploadErr.message : String(uploadErr);
           console.error('Failed to upload PDF:', uploadErr);
         }
 
@@ -240,6 +242,8 @@ Return ONLY the JSON object, no additional text or explanation.`,
       validationIssues,
       confidence,
       status,
+      pdfUrl,
+      pdfUploadError,
     });
   } catch (error) {
     console.error('Certificate extraction error:', error);
