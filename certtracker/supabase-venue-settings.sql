@@ -25,7 +25,8 @@ ON CONFLICT (id) DO NOTHING;
 ALTER TABLE venue_settings ENABLE ROW LEVEL SECURITY;
 
 -- Allow all access (same pattern as other tables)
-CREATE POLICY IF NOT EXISTS "Allow all access to venue_settings"
+DROP POLICY IF EXISTS "Allow all access to venue_settings" ON venue_settings;
+CREATE POLICY "Allow all access to venue_settings"
 ON venue_settings
 FOR ALL USING (true) WITH CHECK (true);
 
